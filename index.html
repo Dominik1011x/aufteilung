@@ -550,7 +550,6 @@
       { label: "GEZ", value: 0, split: 50 },
       { label: "Hausrat", value: 0, split: 50 }
     ],
-    extra: { ammerlaender: 0 },
     vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
   };
 
@@ -573,7 +572,6 @@
       if (saved.rent !== undefined || saved.rentExtra !== undefined) {
         base.rent = migrateRent(saved);
       }
-      if (saved.extra) Object.keys(base.extra).forEach(function (k) { if (typeof saved.extra[k] === "number") base.extra[k] = saved.extra[k]; });
       if (saved.vodafone) Object.keys(base.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") base.vodafone[k] = saved.vodafone[k]; });
 
       if (saved.partner && typeof saved.partner === "object") {
@@ -832,7 +830,6 @@
           row("Gesamt", c.mieteGesamt, c.meineMiete, c.partnerMiete, "grandtotal") +
         '</table></div>' +
         splitBarHtml +
-        '<div class="note">Ammerländer Versicherung (separat, nicht in „Gesamt“ enthalten): <span class="val">' + eur(s.extra.ammerlaender) + '</span></div>' +
       '</div>';
 
     var vodafoneCard =
@@ -935,7 +932,6 @@
         '<button type="button" class="btn-add-row" data-add-list="rent">+ Position hinzufügen</button>' +
         '<div class="calc-line total"><span>Gesamt Miete</span><span class="val" id="calc-mieteGesamt"></span></div>' +
         splitBarHtml +
-        '<div class="field-row" style="margin-top:10px"><label>Ammerländer Versicherung (separat)</label><div class="input-euro">' + inputField("extra.ammerlaender", s.extra.ammerlaender) + '</div></div>' +
       '</div>';
 
     var vodafoneCard =
