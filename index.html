@@ -340,6 +340,11 @@
     border: 1px solid var(--line-strong); border-radius: 7px;
     background: var(--paper); color: var(--ink);
   }
+  .freq-select {
+    flex: none; font: inherit; font-size: 11.5px; padding: 6px 4px;
+    border: 1px solid var(--line-strong); border-radius: 7px;
+    background: var(--paper); color: var(--ink-soft); width: 62px;
+  }
   .btn-remove-row {
     appearance: none; cursor: pointer; flex: none;
     display: flex; align-items: center; justify-content: center;
@@ -454,6 +459,8 @@
   @media (max-width: 720px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .ledger-grid { grid-template-columns: 1fr; }
+    .list-row input[type="number"] { width: 84px; }
+    .freq-select { width: 50px; font-size: 10.5px; padding: 6px 2px; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -542,13 +549,13 @@
     traderepublic: [],
     sonstiges: [],
     rent: [
-      { label: "Kaltmiete", value: 0, split: 50 },
-      { label: "Heizkosten", value: 0, split: 50 },
-      { label: "Betriebskosten", value: 0, split: 50 },
-      { label: "Strom", value: 0, split: 50 },
-      { label: "Internet", value: 0, split: 50 },
-      { label: "GEZ", value: 0, split: 50 },
-      { label: "Hausrat", value: 0, split: 50 }
+      { label: "Kaltmiete", value: 0, split: 50, freq: "monthly" },
+      { label: "Heizkosten", value: 0, split: 50, freq: "monthly" },
+      { label: "Betriebskosten", value: 0, split: 50, freq: "monthly" },
+      { label: "Strom", value: 0, split: 50, freq: "monthly" },
+      { label: "Internet", value: 0, split: 50, freq: "monthly" },
+      { label: "GEZ", value: 0, split: 50, freq: "monthly" },
+      { label: "Hausrat", value: 0, split: 50, freq: "monthly" }
     ],
     vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
   };
@@ -558,6 +565,8 @@
   function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
   function eur(n) { return num(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
   function pct1(n) { return (n * 100).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %"; }
+  function normFreq(f) { return f === "yearly" ? "yearly" : "monthly"; }
+  function monthlyValue(it) { return normFreq(it.freq) === "yearly" ? num(it.value) / 12 : num(it.value); }
 
   function mergeState(base, saved) {
     if (saved && typeof saved === "object") {
@@ -566,7 +575,7 @@
         if (Array.isArray(saved[key])) {
           base[key] = saved[key]
             .filter(function (item) { return item && typeof item === "object"; })
-            .map(function (item) { return { label: typeof item.label === "string" ? item.label : "", value: num(item.value) }; });
+            .map(function (item) { return { label: typeof item.label === "string" ? item.label : "", value: num(item.value), freq: normFreq(item.freq) }; });
         }
       });
       if (saved.rent !== undefined || saved.rentExtra !== undefined) {
@@ -597,7 +606,8 @@
           return {
             label: typeof it.label === "string" ? it.label : "",
             value: num(it.value),
-            split: typeof it.split === "number" ? clamp(it.split, 0, 100) : 50
+            split: typeof it.split === "number" ? clamp(it.split, 0, 100) : 50,
+            freq: normFreq(it.freq)
           };
         });
     }
@@ -610,7 +620,7 @@
         var split = 50;
         if (rs && typeof rs[k] === "number") split = clamp(rs[k], 0, 100);
         else if (legacyPct !== null) split = (k === "internet" || k === "gez" || k === "hausrat") ? 50 : legacyPct;
-        items.push({ label: LEGACY_RENT_LABELS[k], value: saved.rent[k], split: split });
+        items.push({ label: LEGACY_RENT_LABELS[k], value: saved.rent[k], split: split, freq: "monthly" });
       });
     }
     if (Array.isArray(saved.rentExtra)) {
@@ -619,7 +629,8 @@
         items.push({
           label: typeof it.label === "string" ? it.label : "",
           value: num(it.value),
-          split: typeof it.split === "number" ? clamp(it.split, 0, 100) : 50
+          split: typeof it.split === "number" ? clamp(it.split, 0, 100) : 50,
+          freq: normFreq(it.freq)
         });
       });
     }
@@ -694,9 +705,9 @@
   }
 
   function computeAll(s) {
-    var revolutSum = s.revolut.reduce(function (a, it) { return a + num(it.value); }, 0);
-    var trSum = s.traderepublic.reduce(function (a, it) { return a + num(it.value); }, 0);
-    var sonstigesSum = s.sonstiges.reduce(function (a, it) { return a + num(it.value); }, 0);
+    var revolutSum = s.revolut.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
+    var trSum = s.traderepublic.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
+    var sonstigesSum = s.sonstiges.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
     var ausgabenSparenGesamt = revolutSum + sonstigesSum + trSum;
     var bleibtUebrig = num(s.netto) - ausgabenSparenGesamt;
     var sparquote = num(s.netto) ? trSum / num(s.netto) : 0;
@@ -704,9 +715,9 @@
     var partnerOn = !!(s.partner && s.partner.enabled);
     var rentCalc = s.rent.map(function (it) {
       var pct = partnerOn ? clamp(num(it.split), 0, 100) / 100 : 1;
-      var val = num(it.value);
+      var val = monthlyValue(it);
       var mine = val * pct;
-      return { label: it.label, value: val, mine: mine, partnerVal: val - mine };
+      return { label: it.label, value: val, mine: mine, partnerVal: val - mine, rawValue: num(it.value), freq: normFreq(it.freq) };
     });
     var mieteGesamt = rentCalc.reduce(function (a, it) { return a + it.value; }, 0);
     var meineMiete = rentCalc.reduce(function (a, it) { return a + it.mine; }, 0);
@@ -764,9 +775,14 @@
         '</div>' +
       '</div>';
 
+    function freqHint(it) {
+      if (normFreq(it.freq) !== "yearly") return "";
+      return ' <span class="split-hint">(' + eur(it.value) + '/Jahr)</span>';
+    }
+
     function ledgerCard(title, items, sum) {
       var rows = items.map(function (it) {
-        return '<div class="ledger-row"><span>' + esc(it.label || "(ohne Bezeichnung)") + '</span><span class="val">' + eur(it.value) + '</span></div>';
+        return '<div class="ledger-row"><span>' + esc(it.label || "(ohne Bezeichnung)") + freqHint(it) + '</span><span class="val">' + eur(monthlyValue(it)) + '</span></div>';
       }).join("");
       if (!items.length) rows = '<p class="subtle" style="margin:0 0 8px">Noch keine Einträge.</p>';
       return '<div class="card"><h2>' + title + '</h2>' + rows +
@@ -817,7 +833,7 @@
       : "";
 
     var rentRowsHtml = c.rentCalc.length
-      ? c.rentCalc.map(function (it) { return row(it.label, it.value, it.mine, it.partnerVal, "", splitHint(it.value, it.mine)); }).join("")
+      ? c.rentCalc.map(function (it) { return row(it.label, it.value, it.mine, it.partnerVal, "", splitHint(it.value, it.mine) + freqHint({ value: it.rawValue, freq: it.freq })); }).join("")
       : '<tr><td colspan="' + (partnerOn ? 4 : 2) + '"><span class="subtle">Noch keine Einträge.</span></td></tr>';
 
     var rentCard =
@@ -852,6 +868,14 @@
       '" data-bind="' + path + '" value="' + num(value) + '">';
   }
 
+  function freqSelect(path, freq) {
+    var f = normFreq(freq);
+    return '<select class="freq-select" data-bind-select="' + path + '" title="Monatlich oder jährlich?">' +
+      '<option value="monthly"' + (f === "monthly" ? " selected" : "") + '>mtl.</option>' +
+      '<option value="yearly"' + (f === "yearly" ? " selected" : "") + '>jährl.</option>' +
+    '</select>';
+  }
+
   function buildRechner(s) {
     var el = document.getElementById("view-rechner");
 
@@ -875,6 +899,7 @@
         return '<div class="field-row list-row">' +
           '<input type="text" class="label-input" data-bind-text="' + pathPrefix + '.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
           '<div class="input-euro">' + inputField(pathPrefix + "." + i + ".value", it.value) + '</div>' +
+          freqSelect(pathPrefix + "." + i + ".freq", it.freq) +
           '<button type="button" class="btn-remove-row" data-remove-list="' + pathPrefix + '" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
         '</div>';
       }).join("");
@@ -909,6 +934,7 @@
         '<div class="field-row list-row">' +
           '<input type="text" class="label-input" data-bind-text="rent.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
           '<div class="input-euro">' + inputField("rent." + i + ".value", it.value) + '</div>' +
+          freqSelect("rent." + i + ".freq", it.freq) +
           '<button type="button" class="btn-remove-row" data-remove-list="rent" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
         '</div>' +
         splitControl +
@@ -960,6 +986,13 @@
         saveState();
       });
     });
+    el.querySelectorAll("[data-bind-select]").forEach(function (select) {
+      select.addEventListener("change", function () {
+        setPath(state, select.getAttribute("data-bind-select"), select.value);
+        render();
+        saveState();
+      });
+    });
     el.querySelectorAll(".btn-remove-row").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var list = btn.getAttribute("data-remove-list");
@@ -973,7 +1006,7 @@
     el.querySelectorAll(".btn-add-row").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var list = btn.getAttribute("data-add-list");
-        var item = { label: "", value: 0 };
+        var item = { label: "", value: 0, freq: "monthly" };
         if (list === "rent") item.split = 50;
         getPath(state, list).push(item);
         buildRechner(state);
