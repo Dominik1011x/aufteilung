@@ -356,6 +356,21 @@
   }
   footer.savebar .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 
+  .loading-screen {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: var(--paper); color: var(--ink-soft); font-size: 14px; text-align: center; padding: 24px;
+  }
+  .loading-screen.hidden { display: none; }
+  .loading-spinner {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2.5px solid var(--line-strong); border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-screen .btn-reset { margin-top: 4px; }
+
   @media (max-width: 720px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .ledger-grid { grid-template-columns: 1fr; }
@@ -366,6 +381,11 @@
     .mode-switch button, .btn-reset, .alloc-bar span, .split-bar .seg { transition: all 0.18s ease; }
   }
 </style>
+
+<div class="loading-screen" id="loading-screen">
+  <div class="loading-spinner" aria-hidden="true"></div>
+  <div id="loading-text">Verbindung zur Datenbank …</div>
+</div>
 
 <div class="app">
   <header class="topbar">
@@ -384,14 +404,24 @@
     <section id="view-rechner" class="view" aria-label="Rechner"></section>
   </main>
 
-  <footer class="savebar"><span class="dot-live" aria-hidden="true"></span> Änderungen im Rechner werden automatisch lokal in diesem Browser gespeichert.</footer>
+  <footer class="savebar"><span class="dot-live" aria-hidden="true"></span> <span id="sync-status">Verbunden</span> &ndash; Änderungen werden geräteübergreifend synchronisiert.</footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "aufteilung-state-v1";
+  /* Diese Werte sind bewusst öffentlich im Code: der "anon key" ist für den
+     Einsatz im Browser gedacht, der eigentliche Zugriffsschutz läuft über die
+     Row-Level-Security-Policy in Supabase, nicht über Geheimhaltung des Keys. */
+  var SUPABASE_URL = "https://fqaqdxvlzzclxzgqsdgl.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxYXFkeHZsenpjbHh6Z3FzZGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODMxMTMsImV4cCI6MjEwMTg1OTExM30.9KSGMIsN4Luw3iT73prrKrdqpef1mgNsZqOT0xG3lgM";
+  var ROW_ID = "bedfece1-d2db-41ad-98d4-0cfeecaa5a78";
+
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  var remoteUpdatedAt = null;
+  var saveTimer = null;
 
   var DEFAULTS = {
     netto: 0,
@@ -436,36 +466,73 @@
   function eur(n) { return num(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
   function pct1(n) { return (n * 100).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %"; }
 
-  function loadState() {
-    var s = deepClone(DEFAULTS);
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        var saved = JSON.parse(raw);
-        if (saved && typeof saved === "object") {
-          if (typeof saved.netto === "number") s.netto = saved.netto;
-          if (typeof saved.splitPercent === "number") s.splitPercent = saved.splitPercent;
-          ["revolut", "traderepublic", "sonstiges"].forEach(function (key) {
-            if (Array.isArray(saved[key]) && saved[key].length === s[key].length) {
-              saved[key].forEach(function (item, i) {
-                if (item && typeof item.value === "number") s[key][i].value = item.value;
-              });
-            }
+  function mergeState(base, saved) {
+    if (saved && typeof saved === "object") {
+      if (typeof saved.netto === "number") base.netto = saved.netto;
+      if (typeof saved.splitPercent === "number") base.splitPercent = saved.splitPercent;
+      ["revolut", "traderepublic", "sonstiges"].forEach(function (key) {
+        if (Array.isArray(saved[key]) && saved[key].length === base[key].length) {
+          saved[key].forEach(function (item, i) {
+            if (item && typeof item.value === "number") base[key][i].value = item.value;
           });
-          if (saved.rent) Object.keys(s.rent).forEach(function (k) { if (typeof saved.rent[k] === "number") s.rent[k] = saved.rent[k]; });
-          if (saved.extra) Object.keys(s.extra).forEach(function (k) { if (typeof saved.extra[k] === "number") s.extra[k] = saved.extra[k]; });
-          if (saved.vodafone) Object.keys(s.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") s.vodafone[k] = saved.vodafone[k]; });
         }
-      }
-    } catch (e) { /* ignore corrupted storage */ }
-    return s;
+      });
+      if (saved.rent) Object.keys(base.rent).forEach(function (k) { if (typeof saved.rent[k] === "number") base.rent[k] = saved.rent[k]; });
+      if (saved.extra) Object.keys(base.extra).forEach(function (k) { if (typeof saved.extra[k] === "number") base.extra[k] = saved.extra[k]; });
+      if (saved.vodafone) Object.keys(base.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") base.vodafone[k] = saved.vodafone[k]; });
+    }
+    return base;
+  }
+
+  async function loadRemoteState() {
+    var res = await sb.from("budget_state").select("data, updated_at").eq("id", ROW_ID).maybeSingle();
+    if (res.error) throw res.error;
+    if (res.data) {
+      remoteUpdatedAt = res.data.updated_at;
+      return mergeState(deepClone(DEFAULTS), res.data.data);
+    }
+    var seed = deepClone(DEFAULTS);
+    var ins = await sb.from("budget_state").insert({ id: ROW_ID, data: seed }).select("updated_at").single();
+    if (ins.error) throw ins.error;
+    remoteUpdatedAt = ins.data.updated_at;
+    return seed;
   }
 
   function saveState() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+    var statusEl = document.getElementById("sync-status");
+    if (statusEl) statusEl.textContent = "Speichert …";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      sb.from("budget_state")
+        .update({ data: state, updated_at: new Date().toISOString() })
+        .eq("id", ROW_ID)
+        .select("updated_at")
+        .single()
+        .then(function (res) {
+          if (res.error) { if (statusEl) statusEl.textContent = "Speichern fehlgeschlagen"; return; }
+          remoteUpdatedAt = res.data.updated_at;
+          if (statusEl) statusEl.textContent = "Gespeichert";
+        });
+    }, 500);
   }
 
-  var state = loadState();
+  function subscribeRealtime() {
+    sb.channel("budget_state_" + ROW_ID)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budget_state", filter: "id=eq." + ROW_ID }, function (payload) {
+        var row = payload.new;
+        if (!row || !row.updated_at) return;
+        if (remoteUpdatedAt && new Date(row.updated_at).getTime() <= new Date(remoteUpdatedAt).getTime()) return;
+        remoteUpdatedAt = row.updated_at;
+        state = mergeState(deepClone(DEFAULTS), row.data);
+        buildRechner(state);
+        render();
+        var statusEl = document.getElementById("sync-status");
+        if (statusEl) statusEl.textContent = "Aktualisiert von anderem Gerät";
+      })
+      .subscribe();
+  }
+
+  var state = deepClone(DEFAULTS);
 
   function getPath(obj, path) {
     var parts = path.split(".");
@@ -711,18 +778,20 @@
     el.querySelectorAll("input[data-bind]").forEach(function (input) {
       input.addEventListener("input", function () {
         setPath(state, input.getAttribute("data-bind"), num(input.value));
-        update();
+        render();
+        saveState();
       });
     });
     document.getElementById("split-range").addEventListener("input", function (e) {
       state.splitPercent = num(e.target.value);
-      update();
+      render();
+      saveState();
     });
     document.getElementById("btn-reset").addEventListener("click", function () {
       state = deepClone(DEFAULTS);
-      saveState();
       buildRechner(state);
-      update();
+      render();
+      saveState();
     });
   }
 
@@ -755,11 +824,10 @@
     }
   }
 
-  function update() {
+  function render() {
     var c = computeAll(state);
     renderDashboard(state, c);
     updateRechnerComputed(c);
-    saveState();
   }
 
   /* ---------- Mode switching ---------- */
@@ -778,7 +846,27 @@
     });
   });
 
-  buildRechner(state);
-  update();
+  (async function init() {
+    var loadingScreen = document.getElementById("loading-screen");
+    var loadingText = document.getElementById("loading-text");
+    try {
+      state = await loadRemoteState();
+    } catch (e) {
+      if (loadingText) {
+        loadingText.textContent = "Verbindung fehlgeschlagen. Bitte prüfe deine Internetverbindung.";
+      }
+      var retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "btn-reset";
+      retry.textContent = "Erneut versuchen";
+      retry.addEventListener("click", function () { window.location.reload(); });
+      if (loadingScreen) loadingScreen.appendChild(retry);
+      return;
+    }
+    buildRechner(state);
+    render();
+    subscribeRealtime();
+    if (loadingScreen) loadingScreen.classList.add("hidden");
+  })();
 })();
 </script>
