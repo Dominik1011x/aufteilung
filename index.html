@@ -1,0 +1,783 @@
+<meta charset="utf-8">
+<title>Gehalt & Mietaufteilung</title>
+<style>
+  :root {
+    --paper: #f5f3ee;
+    --paper-raised: #ffffff;
+    --ink: #1c211f;
+    --ink-soft: #57645f;
+    --ink-faint: #8a948f;
+    --line: rgba(28, 33, 31, 0.13);
+    --line-strong: rgba(28, 33, 31, 0.22);
+    --accent: #2f6f62;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3efec;
+    --accent2: #8a4a6a;
+    --accent2-soft: #f4e8ee;
+    --rest: #c7a955;
+    --rest-soft: #f6efdd;
+    --shadow: 0 1px 2px rgba(28, 33, 31, 0.05), 0 8px 24px -16px rgba(28, 33, 31, 0.25);
+    --radius: 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12181a;
+      --paper-raised: #1a2325;
+      --ink: #edf2f0;
+      --ink-soft: #a3b3ad;
+      --ink-faint: #6e7d78;
+      --line: rgba(237, 242, 240, 0.11);
+      --line-strong: rgba(237, 242, 240, 0.2);
+      --accent: #6fbfa8;
+      --accent-ink: #0c1614;
+      --accent-soft: rgba(111, 191, 168, 0.14);
+      --accent2: #dd9cc0;
+      --accent2-soft: rgba(221, 156, 192, 0.14);
+      --rest: #e0c479;
+      --rest-soft: rgba(224, 196, 121, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12181a;
+    --paper-raised: #1a2325;
+    --ink: #edf2f0;
+    --ink-soft: #a3b3ad;
+    --ink-faint: #6e7d78;
+    --line: rgba(237, 242, 240, 0.11);
+    --line-strong: rgba(237, 242, 240, 0.2);
+    --accent: #6fbfa8;
+    --accent-ink: #0c1614;
+    --accent-soft: rgba(111, 191, 168, 0.14);
+    --accent2: #dd9cc0;
+    --accent2-soft: rgba(221, 156, 192, 0.14);
+    --rest: #e0c479;
+    --rest-soft: rgba(224, 196, 121, 0.14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -16px rgba(0, 0, 0, 0.5);
+  }
+  :root[data-theme="light"] {
+    --paper: #f5f3ee;
+    --paper-raised: #ffffff;
+    --ink: #1c211f;
+    --ink-soft: #57645f;
+    --ink-faint: #8a948f;
+    --line: rgba(28, 33, 31, 0.13);
+    --line-strong: rgba(28, 33, 31, 0.22);
+    --accent: #2f6f62;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3efec;
+    --accent2: #8a4a6a;
+    --accent2-soft: #f4e8ee;
+    --rest: #c7a955;
+    --rest-soft: #f6efdd;
+    --shadow: 0 1px 2px rgba(28, 33, 31, 0.05), 0 8px 24px -16px rgba(28, 33, 31, 0.25);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .app { max-width: 980px; margin: 0 auto; padding: 0 20px 64px; }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 0 18px;
+    background: linear-gradient(var(--paper) 82%, transparent);
+    flex-wrap: wrap;
+  }
+
+  .eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: clamp(24px, 3.4vw, 32px);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .mode-switch {
+    display: inline-flex;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+    box-shadow: var(--shadow);
+  }
+  .mode-switch button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .mode-switch button.active { background: var(--accent); color: var(--accent-ink); }
+  .mode-switch button:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .view { display: none; flex-direction: column; gap: 20px; }
+  .view.active { display: flex; }
+
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+  }
+
+  .card h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 14px;
+  }
+  .card .subtle {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: -10px 0 14px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .stat {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .stat .label { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; letter-spacing: 0.02em; }
+  .stat .value {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 21px;
+    font-weight: 600;
+    margin-top: 4px;
+    letter-spacing: -0.01em;
+  }
+  .stat.accent .value { color: var(--accent); }
+
+  .alloc-bar {
+    display: flex;
+    height: 30px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .alloc-bar span { display: block; height: 100%; }
+  .alloc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    margin-top: 14px;
+    font-size: 12.5px;
+  }
+  .alloc-legend .item { display: flex; align-items: center; gap: 7px; color: var(--ink-soft); }
+  .alloc-legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .alloc-legend b {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .ledger-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .ledger-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+  .ledger-row:last-of-type { border-bottom: none; }
+  .ledger-row .val {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .ledger-total {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-strong);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .ledger-total .val {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  table.rent-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.rent-table th {
+    text-align: right;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 0 0 8px;
+  }
+  table.rent-table th:first-child, table.rent-table td:first-child { text-align: left; }
+  table.rent-table td {
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    text-align: right;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  table.rent-table td.label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink-soft);
+  }
+  table.rent-table tr.subtotal td { font-weight: 700; color: var(--ink); border-top: 1px solid var(--line-strong); }
+  table.rent-table tr.subtotal td.label { color: var(--ink); }
+  table.rent-table tr.grandtotal td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--line-strong); padding-top: 10px; }
+  table.rent-table .col-mine { color: var(--accent); }
+  table.rent-table .col-finja { color: var(--accent2); }
+  .overflow-wrap { overflow-x: auto; }
+
+  .split-bar { display: flex; height: 34px; border-radius: 8px; overflow: hidden; margin-top: 16px; border: 1px solid var(--line); }
+  .split-bar .seg {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; font-weight: 700; color: var(--accent-ink);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden;
+  }
+  .split-bar .mine { background: var(--accent); }
+  .split-bar .finja { background: var(--accent2); }
+  .split-legend { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--ink-soft); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .note {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    background: var(--paper);
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 4px;
+  }
+  .note .val { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; color: var(--ink-soft); }
+
+  /* Rechner (editable) view */
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: -4px; }
+  .toolbar .hint { font-size: 12.5px; color: var(--ink-faint); }
+  .btn-reset {
+    appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 13px;
+    border: 1px solid var(--line-strong); background: var(--paper-raised); color: var(--ink);
+    padding: 8px 14px; border-radius: 8px;
+  }
+  .btn-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+  .field-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .field-row:last-of-type { border-bottom: none; }
+  .field-row label { font-size: 13.5px; color: var(--ink-soft); }
+  .field-row .input-euro { position: relative; }
+  .field-row .input-euro::after {
+    content: "€"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; color: var(--ink-faint); pointer-events: none;
+  }
+  input[type="number"] {
+    width: 110px;
+    font: inherit;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    padding: 6px 26px 6px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 7px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  input[type="number"].netto { width: 140px; font-size: 16px; padding: 8px 30px 8px 10px; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+
+  .split-control { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  .split-control input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .split-control .pct-readout {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13.5px; font-weight: 700; min-width: 108px; text-align: right;
+  }
+  .split-control .pct-readout .mine { color: var(--accent); }
+  .split-control .pct-readout .finja { color: var(--accent2); }
+
+  .calc-line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13.5px; }
+  .calc-line .val {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-line.total { border-top: 1px solid var(--line-strong); margin-top: 4px; padding-top: 8px; font-weight: 700; }
+
+  footer.savebar {
+    display: flex; align-items: center; gap: 8px; justify-content: center;
+    font-size: 12px; color: var(--ink-faint); margin-top: 22px;
+  }
+  footer.savebar .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  @media (max-width: 720px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .ledger-grid { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mode-switch button, .btn-reset, .alloc-bar span, .split-bar .seg { transition: all 0.18s ease; }
+  }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="eyebrow">Haushaltsbuch</span>
+      <h1>Gehalt &amp; Mietaufteilung</h1>
+    </div>
+    <nav class="mode-switch" role="tablist" aria-label="Ansicht wählen">
+      <button type="button" data-mode="dashboard" class="active" role="tab" aria-selected="true">Übersicht</button>
+      <button type="button" data-mode="rechner" role="tab" aria-selected="false">Rechner</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-dashboard" class="view active" aria-label="Übersicht"></section>
+    <section id="view-rechner" class="view" aria-label="Rechner"></section>
+  </main>
+
+  <footer class="savebar"><span class="dot-live" aria-hidden="true"></span> Änderungen im Rechner werden automatisch lokal in diesem Browser gespeichert.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "aufteilung-state-v1";
+
+  var DEFAULTS = {
+    netto: 0,
+    splitPercent: 50,
+    revolut: [
+      { label: "Lebensmittel", value: 0 },
+      { label: "Ausgehen", value: 0 },
+      { label: "Kleidung", value: 0 },
+      { label: "KFZ Vers.", value: 0 },
+      { label: "AMEX", value: 0 },
+      { label: "DB Ticket", value: 0 },
+      { label: "Frisör", value: 0 },
+      { label: "Tanken", value: 0 },
+      { label: "Medikamente", value: 0 },
+      { label: "Sky", value: 0 },
+      { label: "Dazn", value: 0 },
+      { label: "Apple Care", value: 0 },
+      { label: "Revolut", value: 0 },
+      { label: "Spotify", value: 0 },
+      { label: "Gothaer Vers.", value: 0 },
+      { label: "Miles and More", value: 0 },
+      { label: "AXA Vers.", value: 0 },
+      { label: "Amazon", value: 0 },
+      { label: "iCloud", value: 0 },
+      { label: "FCB", value: 0 }
+    ],
+    traderepublic: [
+      { label: "Tagesgeld", value: 0 },
+      { label: "TR Sparpläne", value: 0 }
+    ],
+    sonstiges: [
+      { label: "Miete", value: 0 }
+    ],
+    rent: { kaltmiete: 0, heizkosten: 0, betriebskosten: 0, strom: 0, internet: 0, gez: 0, hausrat: 0 },
+    extra: { ammerlaender: 0 },
+    vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
+  };
+
+  function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+  function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+  function eur(n) { return num(n).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"; }
+  function pct1(n) { return (n * 100).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %"; }
+
+  function loadState() {
+    var s = deepClone(DEFAULTS);
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        if (saved && typeof saved === "object") {
+          if (typeof saved.netto === "number") s.netto = saved.netto;
+          if (typeof saved.splitPercent === "number") s.splitPercent = saved.splitPercent;
+          ["revolut", "traderepublic", "sonstiges"].forEach(function (key) {
+            if (Array.isArray(saved[key]) && saved[key].length === s[key].length) {
+              saved[key].forEach(function (item, i) {
+                if (item && typeof item.value === "number") s[key][i].value = item.value;
+              });
+            }
+          });
+          if (saved.rent) Object.keys(s.rent).forEach(function (k) { if (typeof saved.rent[k] === "number") s.rent[k] = saved.rent[k]; });
+          if (saved.extra) Object.keys(s.extra).forEach(function (k) { if (typeof saved.extra[k] === "number") s.extra[k] = saved.extra[k]; });
+          if (saved.vodafone) Object.keys(s.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") s.vodafone[k] = saved.vodafone[k]; });
+        }
+      }
+    } catch (e) { /* ignore corrupted storage */ }
+    return s;
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+  }
+
+  var state = loadState();
+
+  function getPath(obj, path) {
+    var parts = path.split(".");
+    var cur = obj;
+    for (var i = 0; i < parts.length; i++) cur = cur[parts[i]];
+    return cur;
+  }
+  function setPath(obj, path, value) {
+    var parts = path.split(".");
+    var cur = obj;
+    for (var i = 0; i < parts.length - 1; i++) cur = cur[parts[i]];
+    cur[parts[parts.length - 1]] = value;
+  }
+
+  function computeAll(s) {
+    var revolutSum = s.revolut.reduce(function (a, it) { return a + num(it.value); }, 0);
+    var trSum = s.traderepublic.reduce(function (a, it) { return a + num(it.value); }, 0);
+    var sonstigesSum = s.sonstiges.reduce(function (a, it) { return a + num(it.value); }, 0);
+    var ausgabenSparenGesamt = revolutSum + sonstigesSum + trSum;
+    var bleibtUebrig = num(s.netto) - ausgabenSparenGesamt;
+    var sparquote = num(s.netto) ? trSum / num(s.netto) : 0;
+
+    var r = s.rent;
+    var pct = clamp(num(s.splitPercent), 0, 100) / 100;
+    var meine = {}, finja = {};
+    ["kaltmiete", "heizkosten", "betriebskosten"].forEach(function (k) {
+      meine[k] = num(r[k]) * pct;
+      finja[k] = num(r[k]) * (1 - pct);
+    });
+    var warm = num(r.kaltmiete) + num(r.heizkosten) + num(r.betriebskosten);
+    meine.warm = meine.kaltmiete + meine.heizkosten + meine.betriebskosten;
+    finja.warm = finja.kaltmiete + finja.heizkosten + finja.betriebskosten;
+
+    meine.strom = num(r.strom) * pct; finja.strom = num(r.strom) * (1 - pct);
+    meine.internet = num(r.internet) / 2; finja.internet = num(r.internet) / 2;
+    meine.gez = num(r.gez) / 2; finja.gez = num(r.gez) / 2;
+    meine.hausrat = num(r.hausrat) / 2; finja.hausrat = num(r.hausrat) / 2;
+
+    var nebenSumGesamt = num(r.strom) + num(r.internet) + num(r.gez) + num(r.hausrat);
+    meine.neben = meine.strom + meine.internet + meine.gez + meine.hausrat;
+    finja.neben = finja.strom + finja.internet + finja.gez + finja.hausrat;
+
+    var mieteGesamt = warm + nebenSumGesamt;
+    meine.gesamt = meine.warm + meine.neben;
+    finja.gesamt = finja.warm + finja.neben;
+
+    var v = s.vodafone;
+    var vodafoneMtl = num(v.monate) ? (num(v.total) - num(v.gutschein) - num(v.cashback)) / num(v.monate) : 0;
+
+    return {
+      revolutSum: revolutSum, trSum: trSum, sonstigesSum: sonstigesSum,
+      ausgabenSparenGesamt: ausgabenSparenGesamt, bleibtUebrig: bleibtUebrig, sparquote: sparquote,
+      warm: warm, nebenSumGesamt: nebenSumGesamt, mieteGesamt: mieteGesamt,
+      meine: meine, finja: finja, vodafoneMtl: vodafoneMtl, pct: pct
+    };
+  }
+
+  function esc(str) {
+    return String(str).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  /* ---------- Dashboard (read-only) ---------- */
+
+  function renderDashboard(s, c) {
+    var el = document.getElementById("view-dashboard");
+
+    var ausgabenTotal = c.revolutSum + c.sonstigesSum;
+    var nettoSafe = num(s.netto) || 1;
+    var wAusgaben = clamp(ausgabenTotal / nettoSafe, 0, 1) * 100;
+    var wSparen = clamp(c.trSum / nettoSafe, 0, 1) * 100;
+    var wRest = clamp(100 - wAusgaben - wSparen, 0, 100);
+
+    var statRow =
+      '<div class="stat-row">' +
+        '<div class="stat"><div class="label">Nettogehalt</div><div class="value">' + eur(s.netto) + '</div></div>' +
+        '<div class="stat"><div class="label">Ausgaben</div><div class="value">' + eur(ausgabenTotal) + '</div></div>' +
+        '<div class="stat accent"><div class="label">Sparen</div><div class="value">' + eur(c.trSum) + '</div></div>' +
+        '<div class="stat"><div class="label">Bleibt übrig</div><div class="value">' + eur(c.bleibtUebrig) + '</div></div>' +
+        '<div class="stat"><div class="label">Sparquote</div><div class="value">' + pct1(c.sparquote) + '</div></div>' +
+      '</div>';
+
+    var allocCard =
+      '<div class="card">' +
+        '<h2>Aufteilung des Nettogehalts</h2>' +
+        '<div class="alloc-bar">' +
+          '<span style="width:' + wAusgaben + '%;background:var(--accent2)"></span>' +
+          '<span style="width:' + wSparen + '%;background:var(--accent)"></span>' +
+          '<span style="width:' + wRest + '%;background:var(--rest)"></span>' +
+        '</div>' +
+        '<div class="alloc-legend">' +
+          '<span class="item"><span class="dot" style="background:var(--accent2)"></span>Ausgaben &amp; Miete <b>' + eur(ausgabenTotal) + '</b></span>' +
+          '<span class="item"><span class="dot" style="background:var(--accent)"></span>Sparen <b>' + eur(c.trSum) + '</b></span>' +
+          '<span class="item"><span class="dot" style="background:var(--rest)"></span>Bleibt übrig <b>' + eur(c.bleibtUebrig) + '</b></span>' +
+        '</div>' +
+      '</div>';
+
+    function ledgerCard(title, items, sum) {
+      var rows = items.map(function (it) {
+        return '<div class="ledger-row"><span>' + esc(it.label) + '</span><span class="val">' + eur(it.value) + '</span></div>';
+      }).join("");
+      return '<div class="card"><h2>' + title + '</h2>' + rows +
+        '<div class="ledger-total"><span>Insgesamt</span><span class="val">' + eur(sum) + '</span></div></div>';
+    }
+
+    var ledgerGrid = '<div class="ledger-grid">' +
+      ledgerCard("Ausgaben (Revolut)", s.revolut, c.revolutSum) +
+      ledgerCard("Sparen (Trade Republic)", s.traderepublic, c.trSum) +
+      ledgerCard("Sonstiges", s.sonstiges, c.sonstigesSum) +
+      '</div>';
+
+    var minePctLabel = Math.round(c.pct * 100);
+    var finjaPctLabel = 100 - minePctLabel;
+    var mineWidth = clamp(c.meine.gesamt / (c.mieteGesamt || 1), 0, 1) * 100;
+    var finjaWidth = 100 - mineWidth;
+
+    function row(label, gesamt, mine, finja, cls) {
+      return '<tr class="' + (cls || "") + '"><td class="label">' + label + '</td><td>' + eur(gesamt) + '</td>' +
+        '<td class="col-mine">' + eur(mine) + '</td><td class="col-finja">' + eur(finja) + '</td></tr>';
+    }
+
+    var rentCard =
+      '<div class="card">' +
+        '<h2>Zusammensetzung Miete</h2>' +
+        '<p class="subtle">Meine Kosten ' + minePctLabel + '% · Finjas Kosten ' + finjaPctLabel + '%, sofern nicht abweichend vermerkt</p>' +
+        '<div class="overflow-wrap"><table class="rent-table">' +
+          '<tr><th></th><th>Gesamt</th><th>Meine Kosten</th><th>Finjas Kosten</th></tr>' +
+          row("Kaltmiete", s.rent.kaltmiete, c.meine.kaltmiete, c.finja.kaltmiete) +
+          row("Heizkosten", s.rent.heizkosten, c.meine.heizkosten, c.finja.heizkosten) +
+          row("Betriebskosten", s.rent.betriebskosten, c.meine.betriebskosten, c.finja.betriebskosten) +
+          row("Warmmiete", c.warm, c.meine.warm, c.finja.warm, "subtotal") +
+          row("Strom", s.rent.strom, c.meine.strom, c.finja.strom) +
+          row("Internet (50/50)", s.rent.internet, c.meine.internet, c.finja.internet) +
+          row("GEZ (50/50)", s.rent.gez, c.meine.gez, c.finja.gez) +
+          row("Hausrat (50/50)", s.rent.hausrat, c.meine.hausrat, c.finja.hausrat) +
+          row("Nebenkosten gesamt", c.nebenSumGesamt, c.meine.neben, c.finja.neben, "subtotal") +
+          row("Gesamt", c.mieteGesamt, c.meine.gesamt, c.finja.gesamt, "grandtotal") +
+        '</table></div>' +
+        '<div class="split-bar">' +
+          '<div class="seg mine" style="width:' + mineWidth + '%">' + eur(c.meine.gesamt) + '</div>' +
+          '<div class="seg finja" style="width:' + finjaWidth + '%">' + eur(c.finja.gesamt) + '</div>' +
+        '</div>' +
+        '<div class="split-legend"><span>Meine Kosten (' + minePctLabel + '%)</span><span>Finjas Kosten (' + finjaPctLabel + '%)</span></div>' +
+        '<div class="note">Ammerländer Versicherung (separat, nicht in „Gesamt“ enthalten): <span class="val">' + eur(s.extra.ammerlaender) + '</span></div>' +
+      '</div>';
+
+    var vodafoneCard =
+      '<div class="card">' +
+        '<h2>Vodafone-Vertrag</h2>' +
+        '<div class="ledger-row"><span>Vertragskosten gesamt</span><span class="val">' + eur(s.vodafone.total) + '</span></div>' +
+        '<div class="ledger-row"><span>BestChoice Gutschein (erhalten)</span><span class="val">−' + eur(s.vodafone.gutschein) + '</span></div>' +
+        '<div class="ledger-row"><span>Cashback nach 6 Monaten</span><span class="val">−' + eur(s.vodafone.cashback) + '</span></div>' +
+        '<div class="ledger-row"><span>Laufzeit</span><span class="val">' + num(s.vodafone.monate) + ' Monate</span></div>' +
+        '<div class="ledger-total"><span>Ø Kosten pro Monat</span><span class="val">' + eur(c.vodafoneMtl) + '</span></div>' +
+      '</div>';
+
+    el.innerHTML = statRow + allocCard + ledgerGrid + rentCard + vodafoneCard;
+  }
+
+  /* ---------- Rechner (editable) ---------- */
+
+  function inputField(path, value, extraClass) {
+    return '<input type="number" step="0.01" inputmode="decimal" class="' + (extraClass || "") +
+      '" data-bind="' + path + '" value="' + num(value) + '">';
+  }
+
+  function buildRechner(s) {
+    var el = document.getElementById("view-rechner");
+
+    var toolbar =
+      '<div class="toolbar">' +
+        '<span class="hint">Werte anpassen &ndash; alle Summen &amp; die Mietaufteilung rechnen live neu.</span>' +
+        '<button type="button" class="btn-reset" id="btn-reset">Auf Originalwerte zurücksetzen</button>' +
+      '</div>';
+
+    var salaryCard =
+      '<div class="card">' +
+        '<h2>Gehalt</h2>' +
+        '<div class="field-row"><label>Nettogehalt</label><div class="input-euro">' + inputField("netto", s.netto, "netto") + '</div></div>' +
+        '<div class="calc-line"><span>Ausgaben &amp; Sparen gesamt</span><span class="val" id="calc-ausgabenSparenGesamt"></span></div>' +
+        '<div class="calc-line"><span>Bleibt übrig</span><span class="val" id="calc-bleibtUebrig"></span></div>' +
+        '<div class="calc-line total"><span>Sparquote</span><span class="val" id="calc-sparquote"></span></div>' +
+      '</div>';
+
+    function listCard(id, title, items, pathPrefix) {
+      var rows = items.map(function (it, i) {
+        return '<div class="field-row"><label>' + esc(it.label) + '</label><div class="input-euro">' +
+          inputField(pathPrefix + "." + i + ".value", it.value) + '</div></div>';
+      }).join("");
+      return '<div class="card"><h2>' + title + '</h2>' + rows +
+        '<div class="calc-line total"><span>Insgesamt</span><span class="val" id="calc-' + id + 'Sum"></span></div></div>';
+    }
+
+    var ledgerGrid = '<div class="ledger-grid">' +
+      listCard("revolut", "Ausgaben (Revolut)", s.revolut, "revolut") +
+      listCard("tr", "Sparen (Trade Republic)", s.traderepublic, "traderepublic") +
+      listCard("sonstiges", "Sonstiges", s.sonstiges, "sonstiges") +
+      '</div>';
+
+    var rentCard =
+      '<div class="card">' +
+        '<h2>Zusammensetzung Miete</h2>' +
+        '<div class="two-col">' +
+          '<div>' +
+            '<div class="field-row"><label>Kaltmiete</label><div class="input-euro">' + inputField("rent.kaltmiete", s.rent.kaltmiete) + '</div></div>' +
+            '<div class="field-row"><label>Heizkosten</label><div class="input-euro">' + inputField("rent.heizkosten", s.rent.heizkosten) + '</div></div>' +
+            '<div class="field-row"><label>Betriebskosten</label><div class="input-euro">' + inputField("rent.betriebskosten", s.rent.betriebskosten) + '</div></div>' +
+            '<div class="calc-line total"><span>Warmmiete</span><span class="val" id="calc-warm"></span></div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="field-row"><label>Strom</label><div class="input-euro">' + inputField("rent.strom", s.rent.strom) + '</div></div>' +
+            '<div class="field-row"><label>Internet (50/50)</label><div class="input-euro">' + inputField("rent.internet", s.rent.internet) + '</div></div>' +
+            '<div class="field-row"><label>GEZ (50/50)</label><div class="input-euro">' + inputField("rent.gez", s.rent.gez) + '</div></div>' +
+            '<div class="field-row"><label>Hausrat (50/50)</label><div class="input-euro">' + inputField("rent.hausrat", s.rent.hausrat) + '</div></div>' +
+            '<div class="calc-line total"><span>Nebenkosten gesamt</span><span class="val" id="calc-neben"></span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="calc-line total"><span>Gesamt Warmmiete + Nebenkosten</span><span class="val" id="calc-mieteGesamt"></span></div>' +
+        '<div class="split-control">' +
+          '<input type="range" min="0" max="100" step="1" id="split-range" value="' + num(s.splitPercent) + '">' +
+          '<span class="pct-readout"><span class="mine" id="split-mine-label"></span> / <span class="finja" id="split-finja-label"></span></span>' +
+        '</div>' +
+        '<div class="split-bar" id="split-bar-live">' +
+          '<div class="seg mine" id="split-seg-mine"></div>' +
+          '<div class="seg finja" id="split-seg-finja"></div>' +
+        '</div>' +
+        '<div class="field-row" style="margin-top:10px"><label>Ammerländer Versicherung (separat)</label><div class="input-euro">' + inputField("extra.ammerlaender", s.extra.ammerlaender) + '</div></div>' +
+      '</div>';
+
+    var vodafoneCard =
+      '<div class="card">' +
+        '<h2>Vodafone-Vertrag</h2>' +
+        '<div class="field-row"><label>Vertragskosten gesamt</label><div class="input-euro">' + inputField("vodafone.total", s.vodafone.total) + '</div></div>' +
+        '<div class="field-row"><label>BestChoice Gutschein</label><div class="input-euro">' + inputField("vodafone.gutschein", s.vodafone.gutschein) + '</div></div>' +
+        '<div class="field-row"><label>Cashback nach 6 Monaten</label><div class="input-euro">' + inputField("vodafone.cashback", s.vodafone.cashback) + '</div></div>' +
+        '<div class="field-row"><label>Laufzeit (Monate)</label><div class="input-euro" style="--u:none"><input type="number" step="1" class="" data-bind="vodafone.monate" value="' + num(s.vodafone.monate) + '"></div></div>' +
+        '<div class="calc-line total"><span>Ø Kosten pro Monat</span><span class="val" id="calc-vodafoneMtl"></span></div>' +
+      '</div>';
+
+    el.innerHTML = toolbar + salaryCard + ledgerGrid + rentCard + vodafoneCard;
+
+    el.querySelectorAll("input[data-bind]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        setPath(state, input.getAttribute("data-bind"), num(input.value));
+        update();
+      });
+    });
+    document.getElementById("split-range").addEventListener("input", function (e) {
+      state.splitPercent = num(e.target.value);
+      update();
+    });
+    document.getElementById("btn-reset").addEventListener("click", function () {
+      state = deepClone(DEFAULTS);
+      saveState();
+      buildRechner(state);
+      update();
+    });
+  }
+
+  function updateRechnerComputed(c) {
+    var set = function (id, text) { var e = document.getElementById(id); if (e) e.textContent = text; };
+    set("calc-ausgabenSparenGesamt", eur(c.ausgabenSparenGesamt));
+    set("calc-bleibtUebrig", eur(c.bleibtUebrig));
+    set("calc-sparquote", pct1(c.sparquote));
+    set("calc-revolutSum", eur(c.revolutSum));
+    set("calc-trSum", eur(c.trSum));
+    set("calc-sonstigesSum", eur(c.sonstigesSum));
+    set("calc-warm", eur(c.warm));
+    set("calc-neben", eur(c.nebenSumGesamt));
+    set("calc-mieteGesamt", eur(c.mieteGesamt));
+    set("calc-vodafoneMtl", eur(c.vodafoneMtl));
+
+    var minePctLabel = Math.round(c.pct * 100);
+    var finjaPctLabel = 100 - minePctLabel;
+    set("split-mine-label", "Meine " + minePctLabel + "%");
+    set("split-finja-label", "Finjas " + finjaPctLabel + "%");
+
+    var mineWidth = clamp(c.meine.gesamt / (c.mieteGesamt || 1), 0, 1) * 100;
+    var mineSeg = document.getElementById("split-seg-mine");
+    var finjaSeg = document.getElementById("split-seg-finja");
+    if (mineSeg && finjaSeg) {
+      mineSeg.style.width = mineWidth + "%";
+      finjaSeg.style.width = (100 - mineWidth) + "%";
+      mineSeg.textContent = eur(c.meine.gesamt);
+      finjaSeg.textContent = eur(c.finja.gesamt);
+    }
+  }
+
+  function update() {
+    var c = computeAll(state);
+    renderDashboard(state, c);
+    updateRechnerComputed(c);
+    saveState();
+  }
+
+  /* ---------- Mode switching ---------- */
+
+  document.querySelectorAll(".mode-switch button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".mode-switch button").forEach(function (b) {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      var mode = btn.getAttribute("data-mode");
+      document.getElementById("view-dashboard").classList.toggle("active", mode === "dashboard");
+      document.getElementById("view-rechner").classList.toggle("active", mode === "rechner");
+    });
+  });
+
+  buildRechner(state);
+  update();
+})();
+</script>
