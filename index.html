@@ -157,6 +157,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     padding: 20px 22px;
+    min-width: 0;
   }
 
   .card h2 {
@@ -182,6 +183,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     padding: 14px 16px;
+    min-width: 0;
   }
   .stat .label { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; letter-spacing: 0.02em; }
   .stat .value {
@@ -289,6 +291,7 @@
   .split-legend { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--ink-soft); }
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .two-col > div { min-width: 0; }
 
   .note {
     font-size: 12.5px;
