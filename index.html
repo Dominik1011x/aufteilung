@@ -361,6 +361,10 @@
   .partner-row .partner-row-label { font-size: 12.5px; color: var(--ink-faint); flex: none; }
   .partner-row .partner-name-input { flex: 1; min-width: 120px; max-width: 220px; }
 
+  .rent-extra-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .rent-extra-item { margin-bottom: 12px; }
+  .rent-extra-item .split-item-head { margin-top: 6px; }
+
   .split-section { display: flex; flex-direction: column; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
   .split-item input[type="range"] { width: 100%; accent-color: var(--accent); }
   .split-item-head {
@@ -545,6 +549,7 @@
     sonstiges: [],
     rent: { kaltmiete: 0, heizkosten: 0, betriebskosten: 0, strom: 0, internet: 0, gez: 0, hausrat: 0 },
     rentSplit: { kaltmiete: 50, heizkosten: 50, betriebskosten: 50, strom: 50, internet: 50, gez: 50, hausrat: 50 },
+    rentExtra: [],
     extra: { ammerlaender: 0 },
     vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
   };
@@ -566,6 +571,17 @@
         }
       });
       if (saved.rent) Object.keys(base.rent).forEach(function (k) { if (typeof saved.rent[k] === "number") base.rent[k] = saved.rent[k]; });
+      if (Array.isArray(saved.rentExtra)) {
+        base.rentExtra = saved.rentExtra
+          .filter(function (item) { return item && typeof item === "object"; })
+          .map(function (item) {
+            return {
+              label: typeof item.label === "string" ? item.label : "",
+              value: num(item.value),
+              split: typeof item.split === "number" ? clamp(item.split, 0, 100) : 50
+            };
+          });
+      }
       if (saved.extra) Object.keys(base.extra).forEach(function (k) { if (typeof saved.extra[k] === "number") base.extra[k] = saved.extra[k]; });
       if (saved.vodafone) Object.keys(base.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") base.vodafone[k] = saved.vodafone[k]; });
 
@@ -681,6 +697,18 @@
     meine.neben = meine.strom + meine.internet + meine.gez + meine.hausrat;
     partner.neben = partner.strom + partner.internet + partner.gez + partner.hausrat;
 
+    var rentExtraCalc = s.rentExtra.map(function (it) {
+      var pct = partnerOn ? clamp(num(it.split), 0, 100) / 100 : 1;
+      var val = num(it.value);
+      var mine = val * pct;
+      return { label: it.label, value: val, mine: mine, partnerVal: val - mine };
+    });
+    rentExtraCalc.forEach(function (it) {
+      nebenSumGesamt += it.value;
+      meine.neben += it.mine;
+      partner.neben += it.partnerVal;
+    });
+
     var mieteGesamt = warm + nebenSumGesamt;
     meine.gesamt = meine.warm + meine.neben;
     partner.gesamt = partner.warm + partner.neben;
@@ -692,7 +720,7 @@
       revolutSum: revolutSum, trSum: trSum, sonstigesSum: sonstigesSum,
       ausgabenSparenGesamt: ausgabenSparenGesamt, bleibtUebrig: bleibtUebrig, sparquote: sparquote,
       warm: warm, nebenSumGesamt: nebenSumGesamt, mieteGesamt: mieteGesamt,
-      meine: meine, partner: partner, partnerOn: partnerOn, vodafoneMtl: vodafoneMtl
+      meine: meine, partner: partner, partnerOn: partnerOn, rentExtraCalc: rentExtraCalc, vodafoneMtl: vodafoneMtl
     };
   }
 
@@ -803,6 +831,9 @@
           row("Internet", s.rent.internet, c.meine.internet, c.partner.internet, "", splitHint(s.rent.internet, c.meine.internet)) +
           row("GEZ", s.rent.gez, c.meine.gez, c.partner.gez, "", splitHint(s.rent.gez, c.meine.gez)) +
           row("Hausrat", s.rent.hausrat, c.meine.hausrat, c.partner.hausrat, "", splitHint(s.rent.hausrat, c.meine.hausrat)) +
+          c.rentExtraCalc.map(function (it) {
+            return row(it.label || "(ohne Bezeichnung)", it.value, it.mine, it.partnerVal, "", splitHint(it.value, it.mine));
+          }).join("") +
           row("Nebenkosten gesamt", c.nebenSumGesamt, c.meine.neben, c.partner.neben, "subtotal") +
           row("Gesamt", c.mieteGesamt, c.meine.gesamt, c.partner.gesamt, "grandtotal") +
         '</table></div>' +
@@ -899,6 +930,28 @@
         '<div class="split-legend"><span id="split-legend-mine"></span><span id="split-legend-partner"></span></div>';
     }
 
+    var rentExtraRows = s.rentExtra.map(function (it, i) {
+      var splitControl = partnerOn
+        ? '<div class="split-item-head"><span></span><span class="pct-readout"><span class="mine" id="split-mine-label-extra-' + i + '"></span> / <span class="partner" id="split-partner-label-extra-' + i + '"></span></span></div>' +
+          '<input type="range" min="0" max="100" step="1" class="rent-extra-split-range" data-extra-index="' + i + '" value="' + clamp(num(it.split), 0, 100) + '">'
+        : "";
+      return '<div class="rent-extra-item">' +
+        '<div class="field-row list-row">' +
+          '<input type="text" class="label-input" data-bind-text="rentExtra.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
+          '<div class="input-euro">' + inputField("rentExtra." + i + ".value", it.value) + '</div>' +
+          '<button type="button" class="btn-remove-row" data-remove-list="rentExtra" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
+        '</div>' +
+        splitControl +
+      '</div>';
+    }).join("");
+
+    var rentExtraSectionHtml =
+      '<div class="rent-extra-section">' +
+        '<div class="split-item-title" style="margin-bottom:10px">Weitere Nebenkosten</div>' +
+        rentExtraRows +
+        '<button type="button" class="btn-add-row" data-add-list="rentExtra">+ Position hinzufügen</button>' +
+      '</div>';
+
     var rentCard =
       '<div class="card">' +
         '<h2>Zusammensetzung Miete</h2>' +
@@ -918,6 +971,7 @@
             '<div class="calc-line total"><span>Nebenkosten gesamt</span><span class="val" id="calc-neben"></span></div>' +
           '</div>' +
         '</div>' +
+        rentExtraSectionHtml +
         '<div class="calc-line total"><span>Gesamt Warmmiete + Nebenkosten</span><span class="val" id="calc-mieteGesamt"></span></div>' +
         splitSectionHtml +
         '<div class="field-row" style="margin-top:10px"><label>Ammerländer Versicherung (separat)</label><div class="input-euro">' + inputField("extra.ammerlaender", s.extra.ammerlaender) + '</div></div>' +
@@ -962,7 +1016,9 @@
     el.querySelectorAll(".btn-add-row").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var list = btn.getAttribute("data-add-list");
-        getPath(state, list).push({ label: "", value: 0 });
+        var item = { label: "", value: 0 };
+        if (list === "rentExtra") item.split = 50;
+        getPath(state, list).push(item);
         buildRechner(state);
         render();
         saveState();
@@ -985,6 +1041,14 @@
       el.querySelectorAll(".rent-split-range").forEach(function (input) {
         input.addEventListener("input", function (e) {
           state.rentSplit[e.target.getAttribute("data-split-key")] = num(e.target.value);
+          render();
+          saveState();
+        });
+      });
+      el.querySelectorAll(".rent-extra-split-range").forEach(function (input) {
+        input.addEventListener("input", function (e) {
+          var idx = parseInt(e.target.getAttribute("data-extra-index"), 10);
+          state.rentExtra[idx].split = num(e.target.value);
           render();
           saveState();
         });
@@ -1024,6 +1088,11 @@
         var pct = Math.round(clamp(num(state.rentSplit[k]), 0, 100));
         set("split-mine-label-" + k, "Meine " + pct + "%");
         set("split-partner-label-" + k, partnerName + " " + (100 - pct) + "%");
+      });
+      state.rentExtra.forEach(function (it, i) {
+        var pct = Math.round(clamp(num(it.split), 0, 100));
+        set("split-mine-label-extra-" + i, "Meine " + pct + "%");
+        set("split-partner-label-extra-" + i, partnerName + " " + (100 - pct) + "%");
       });
 
       var minePctLabel = c.mieteGesamt ? Math.round(c.meine.gesamt / c.mieteGesamt * 100) : 0;
