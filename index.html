@@ -363,10 +363,11 @@
   .partner-row .partner-row-label { font-size: 12.5px; color: var(--ink-faint); flex: none; }
   .partner-row .partner-name-input { flex: 1; min-width: 120px; max-width: 220px; }
 
-  .rent-item { margin-bottom: 12px; }
-  .rent-item:last-of-type { margin-bottom: 0; }
+  .list-item, .rent-item { margin-bottom: 12px; }
+  .list-item:last-of-type, .rent-item:last-of-type { margin-bottom: 0; }
   .rent-item .split-item-head { margin-top: 6px; }
   .rent-item input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .freq-row { display: flex; justify-content: flex-end; margin-top: 6px; }
   .split-item-head {
     display: flex; align-items: baseline; justify-content: flex-end;
     font-size: 12.5px; margin-bottom: 6px;
@@ -459,8 +460,6 @@
   @media (max-width: 720px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .ledger-grid { grid-template-columns: 1fr; }
-    .list-row input[type="number"] { width: 84px; }
-    .freq-select { width: 50px; font-size: 10.5px; padding: 6px 2px; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -896,11 +895,13 @@
 
     function listCard(id, title, items, pathPrefix) {
       var rows = items.map(function (it, i) {
-        return '<div class="field-row list-row">' +
-          '<input type="text" class="label-input" data-bind-text="' + pathPrefix + '.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
-          '<div class="input-euro">' + inputField(pathPrefix + "." + i + ".value", it.value) + '</div>' +
-          freqSelect(pathPrefix + "." + i + ".freq", it.freq) +
-          '<button type="button" class="btn-remove-row" data-remove-list="' + pathPrefix + '" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
+        return '<div class="list-item">' +
+          '<div class="field-row list-row">' +
+            '<input type="text" class="label-input" data-bind-text="' + pathPrefix + '.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
+            '<div class="input-euro">' + inputField(pathPrefix + "." + i + ".value", it.value) + '</div>' +
+            '<button type="button" class="btn-remove-row" data-remove-list="' + pathPrefix + '" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
+          '</div>' +
+          '<div class="freq-row">' + freqSelect(pathPrefix + "." + i + ".freq", it.freq) + '</div>' +
         '</div>';
       }).join("");
       var empty = items.length ? "" : '<p class="subtle" style="margin:0 0 10px">Noch keine Einträge &ndash; füge unten deine eigenen hinzu.</p>';
@@ -934,9 +935,9 @@
         '<div class="field-row list-row">' +
           '<input type="text" class="label-input" data-bind-text="rent.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
           '<div class="input-euro">' + inputField("rent." + i + ".value", it.value) + '</div>' +
-          freqSelect("rent." + i + ".freq", it.freq) +
           '<button type="button" class="btn-remove-row" data-remove-list="rent" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
         '</div>' +
+        '<div class="freq-row">' + freqSelect("rent." + i + ".freq", it.freq) + '</div>' +
         splitControl +
       '</div>';
     }).join("");
