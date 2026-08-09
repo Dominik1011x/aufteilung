@@ -76,6 +76,7 @@
   }
 
   * { box-sizing: border-box; }
+  .hidden { display: none !important; }
 
   body {
     background: var(--paper);
@@ -371,6 +372,55 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .loading-screen .btn-reset { margin-top: 4px; }
 
+  .auth-screen {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--paper); padding: 24px;
+  }
+  .auth-screen.hidden { display: none; }
+  .auth-card {
+    width: 100%; max-width: 360px;
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 28px 26px;
+  }
+  .auth-card .eyebrow { display: block; margin-bottom: 4px; }
+  .auth-card h1 {
+    font-family: Georgia, "Times New Roman", serif; font-size: 22px; margin: 0 0 4px;
+  }
+  .auth-card .auth-sub { font-size: 13px; color: var(--ink-faint); margin: 0 0 20px; }
+  .auth-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .auth-field label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+  .auth-field input {
+    font: inherit; font-size: 14.5px; padding: 9px 11px;
+    border: 1px solid var(--line-strong); border-radius: 7px;
+    background: var(--paper); color: var(--ink); width: 100%;
+  }
+  .auth-submit {
+    width: 100%; appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 14px;
+    border: none; background: var(--accent); color: var(--accent-ink);
+    padding: 10px 14px; border-radius: 8px; margin-top: 4px;
+  }
+  .auth-submit:disabled { opacity: 0.6; cursor: default; }
+  .auth-switch { text-align: center; font-size: 13px; color: var(--ink-faint); margin-top: 16px; }
+  .auth-switch button {
+    appearance: none; border: none; background: none; cursor: pointer;
+    font: inherit; font-weight: 700; color: var(--accent); padding: 0;
+  }
+  .auth-message {
+    font-size: 13px; border-radius: 7px; padding: 9px 11px; margin-bottom: 14px;
+    background: var(--rest-soft); color: var(--ink);
+  }
+  .auth-message.error { background: var(--accent2-soft); color: var(--accent2); }
+
+  .account-chip { display: flex; align-items: center; gap: 10px; }
+  .account-chip .account-email { font-size: 12.5px; color: var(--ink-faint); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-logout {
+    appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 12.5px;
+    border: 1px solid var(--line-strong); background: var(--paper-raised); color: var(--ink-soft);
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .btn-logout:hover { border-color: var(--accent2); color: var(--accent2); }
+
   @media (max-width: 720px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .ledger-grid { grid-template-columns: 1fr; }
@@ -384,10 +434,34 @@
 
 <div class="loading-screen" id="loading-screen">
   <div class="loading-spinner" aria-hidden="true"></div>
-  <div id="loading-text">Verbindung zur Datenbank …</div>
+  <div id="loading-text">Sitzung wird geprüft …</div>
 </div>
 
-<div class="app">
+<div class="auth-screen hidden" id="auth-screen">
+  <div class="auth-card">
+    <span class="eyebrow">Haushaltsbuch</span>
+    <h1 id="auth-title">Anmelden</h1>
+    <p class="auth-sub" id="auth-sub">Melde dich an, um dein privates Haushaltsbuch zu öffnen.</p>
+    <div id="auth-message-slot"></div>
+    <form id="auth-form">
+      <div class="auth-field">
+        <label for="auth-email">E-Mail</label>
+        <input type="email" id="auth-email" autocomplete="email" required>
+      </div>
+      <div class="auth-field">
+        <label for="auth-password">Passwort</label>
+        <input type="password" id="auth-password" autocomplete="current-password" required minlength="6">
+      </div>
+      <button type="submit" class="auth-submit" id="auth-submit">Anmelden</button>
+    </form>
+    <div class="auth-switch">
+      <span id="auth-switch-text">Noch kein Konto?</span>
+      <button type="button" id="auth-switch-btn">Registrieren</button>
+    </div>
+  </div>
+</div>
+
+<div class="app hidden" id="app">
   <header class="topbar">
     <div class="brand">
       <span class="eyebrow">Haushaltsbuch</span>
@@ -397,6 +471,10 @@
       <button type="button" data-mode="dashboard" class="active" role="tab" aria-selected="true">Übersicht</button>
       <button type="button" data-mode="rechner" role="tab" aria-selected="false">Rechner</button>
     </nav>
+    <div class="account-chip">
+      <span class="account-email" id="account-email"></span>
+      <button type="button" class="btn-logout" id="btn-logout">Abmelden</button>
+    </div>
   </header>
 
   <main>
@@ -413,15 +491,17 @@
   "use strict";
 
   /* Diese Werte sind bewusst öffentlich im Code: der "anon key" ist für den
-     Einsatz im Browser gedacht, der eigentliche Zugriffsschutz läuft über die
-     Row-Level-Security-Policy in Supabase, nicht über Geheimhaltung des Keys. */
+     Einsatz im Browser gedacht. Der eigentliche Zugriffsschutz läuft über Supabase
+     Auth (Login) plus Row-Level-Security-Policies, die jede Zeile an genau die
+     Person binden, der sie gehört (auth.uid() = user_id). */
   var SUPABASE_URL = "https://fqaqdxvlzzclxzgqsdgl.supabase.co";
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxYXFkeHZsenpjbHh6Z3FzZGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODMxMTMsImV4cCI6MjEwMTg1OTExM30.9KSGMIsN4Luw3iT73prrKrdqpef1mgNsZqOT0xG3lgM";
-  var ROW_ID = "bedfece1-d2db-41ad-98d4-0cfeecaa5a78";
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   var remoteUpdatedAt = null;
   var saveTimer = null;
+  var currentUserId = null;
+  var realtimeChannel = null;
 
   var DEFAULTS = {
     netto: 0,
@@ -484,15 +564,15 @@
     return base;
   }
 
-  async function loadRemoteState() {
-    var res = await sb.from("budget_state").select("data, updated_at").eq("id", ROW_ID).maybeSingle();
+  async function loadRemoteState(userId) {
+    var res = await sb.from("budget_state").select("data, updated_at").eq("user_id", userId).maybeSingle();
     if (res.error) throw res.error;
     if (res.data) {
       remoteUpdatedAt = res.data.updated_at;
       return mergeState(deepClone(DEFAULTS), res.data.data);
     }
     var seed = deepClone(DEFAULTS);
-    var ins = await sb.from("budget_state").insert({ id: ROW_ID, data: seed }).select("updated_at").single();
+    var ins = await sb.from("budget_state").insert({ id: crypto.randomUUID(), user_id: userId, data: seed }).select("updated_at").single();
     if (ins.error) throw ins.error;
     remoteUpdatedAt = ins.data.updated_at;
     return seed;
@@ -505,7 +585,7 @@
     saveTimer = setTimeout(function () {
       sb.from("budget_state")
         .update({ data: state, updated_at: new Date().toISOString() })
-        .eq("id", ROW_ID)
+        .eq("user_id", currentUserId)
         .select("updated_at")
         .single()
         .then(function (res) {
@@ -516,9 +596,9 @@
     }, 500);
   }
 
-  function subscribeRealtime() {
-    sb.channel("budget_state_" + ROW_ID)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budget_state", filter: "id=eq." + ROW_ID }, function (payload) {
+  function subscribeRealtime(userId) {
+    realtimeChannel = sb.channel("budget_state_" + userId)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "budget_state", filter: "user_id=eq." + userId }, function (payload) {
         var row = payload.new;
         if (!row || !row.updated_at) return;
         if (remoteUpdatedAt && new Date(row.updated_at).getTime() <= new Date(remoteUpdatedAt).getTime()) return;
@@ -530,6 +610,10 @@
         if (statusEl) statusEl.textContent = "Aktualisiert von anderem Gerät";
       })
       .subscribe();
+  }
+
+  function unsubscribeRealtime() {
+    if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
   }
 
   var state = deepClone(DEFAULTS);
@@ -846,27 +930,133 @@
     });
   });
 
-  (async function init() {
-    var loadingScreen = document.getElementById("loading-screen");
-    var loadingText = document.getElementById("loading-text");
-    try {
-      state = await loadRemoteState();
-    } catch (e) {
-      if (loadingText) {
-        loadingText.textContent = "Verbindung fehlgeschlagen. Bitte prüfe deine Internetverbindung.";
+  /* ---------- Auth ---------- */
+
+  var authMode = "signin";
+
+  function showScreen(name) {
+    document.getElementById("loading-screen").classList.toggle("hidden", name !== "loading");
+    document.getElementById("auth-screen").classList.toggle("hidden", name !== "auth");
+    document.getElementById("app").classList.toggle("hidden", name !== "app");
+  }
+
+  function clearAuthMessage() {
+    document.getElementById("auth-message-slot").innerHTML = "";
+  }
+
+  function showAuthMessage(text, isError) {
+    var slot = document.getElementById("auth-message-slot");
+    slot.innerHTML = "";
+    var div = document.createElement("div");
+    div.className = "auth-message" + (isError ? " error" : "");
+    div.textContent = text;
+    slot.appendChild(div);
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    clearAuthMessage();
+    document.getElementById("auth-password").value = "";
+    if (mode === "signup") {
+      document.getElementById("auth-title").textContent = "Konto erstellen";
+      document.getElementById("auth-sub").textContent = "Registriere dich, um dein eigenes, privates Haushaltsbuch anzulegen.";
+      document.getElementById("auth-submit").textContent = "Registrieren";
+      document.getElementById("auth-switch-text").textContent = "Schon ein Konto?";
+      document.getElementById("auth-switch-btn").textContent = "Anmelden";
+    } else {
+      document.getElementById("auth-title").textContent = "Anmelden";
+      document.getElementById("auth-sub").textContent = "Melde dich an, um dein privates Haushaltsbuch zu öffnen.";
+      document.getElementById("auth-submit").textContent = "Anmelden";
+      document.getElementById("auth-switch-text").textContent = "Noch kein Konto?";
+      document.getElementById("auth-switch-btn").textContent = "Registrieren";
+    }
+  }
+
+  function translateAuthError(err) {
+    var msg = (err && err.message) || "";
+    if (/already registered/i.test(msg)) return "Für diese E-Mail existiert bereits ein Konto. Bitte stattdessen anmelden.";
+    if (/invalid login credentials/i.test(msg)) return "E-Mail oder Passwort ist falsch.";
+    if (/password/i.test(msg) && /(6|least)/i.test(msg)) return "Das Passwort muss mindestens 6 Zeichen lang sein.";
+    if (/email/i.test(msg) && /invalid/i.test(msg)) return "Bitte eine gültige E-Mail-Adresse angeben.";
+    return msg || "Etwas ist schiefgelaufen. Bitte erneut versuchen.";
+  }
+
+  document.getElementById("auth-switch-btn").addEventListener("click", function () {
+    setAuthMode(authMode === "signin" ? "signup" : "signin");
+  });
+
+  document.getElementById("auth-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    clearAuthMessage();
+    var email = document.getElementById("auth-email").value.trim();
+    var password = document.getElementById("auth-password").value;
+    var submitBtn = document.getElementById("auth-submit");
+    submitBtn.disabled = true;
+
+    var request = authMode === "signup"
+      ? sb.auth.signUp({ email: email, password: password })
+      : sb.auth.signInWithPassword({ email: email, password: password });
+
+    request.then(function (res) {
+      if (res.error) { showAuthMessage(translateAuthError(res.error), true); return; }
+      if (authMode === "signup" && !res.data.session) {
+        setAuthMode("signin");
+        showAuthMessage("Fast geschafft: Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine Adresse und melde dich danach an.", false);
       }
-      var retry = document.createElement("button");
-      retry.type = "button";
-      retry.className = "btn-reset";
-      retry.textContent = "Erneut versuchen";
-      retry.addEventListener("click", function () { window.location.reload(); });
-      if (loadingScreen) loadingScreen.appendChild(retry);
+      /* Bei erfolgreichem Login/Registrierung mit sofortiger Session übernimmt
+         onAuthStateChange unten das Laden der Daten und Umschalten der Ansicht. */
+    }).finally(function () {
+      submitBtn.disabled = false;
+    });
+  });
+
+  document.getElementById("btn-logout").addEventListener("click", function () {
+    sb.auth.signOut();
+  });
+
+  async function loadUserData(user) {
+    showScreen("loading");
+    document.getElementById("loading-text").textContent = "Daten werden geladen …";
+    try {
+      state = await loadRemoteState(user.id);
+    } catch (e) {
+      document.getElementById("loading-text").textContent = "Verbindung fehlgeschlagen. Bitte prüfe deine Internetverbindung.";
+      var existingRetry = document.getElementById("loading-retry");
+      if (!existingRetry) {
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.id = "loading-retry";
+        retry.className = "btn-reset";
+        retry.textContent = "Erneut versuchen";
+        retry.addEventListener("click", function () { window.location.reload(); });
+        document.getElementById("loading-screen").appendChild(retry);
+      }
       return;
     }
+    currentUserId = user.id;
+    document.getElementById("account-email").textContent = user.email || "";
     buildRechner(state);
     render();
-    subscribeRealtime();
-    if (loadingScreen) loadingScreen.classList.add("hidden");
-  })();
+    subscribeRealtime(user.id);
+    showScreen("app");
+  }
+
+  var lastHandledUserId = null;
+
+  sb.auth.onAuthStateChange(function (event, session) {
+    if (session && session.user) {
+      if (lastHandledUserId === session.user.id) return;
+      lastHandledUserId = session.user.id;
+      loadUserData(session.user);
+    } else {
+      lastHandledUserId = null;
+      unsubscribeRealtime();
+      currentUserId = null;
+      state = deepClone(DEFAULTS);
+      document.getElementById("auth-email").value = "";
+      setAuthMode("signin");
+      showScreen("auth");
+    }
+  });
 })();
 </script>
