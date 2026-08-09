@@ -334,6 +334,25 @@
   input[type="number"].netto { width: 140px; font-size: 16px; padding: 8px 30px 8px 10px; }
   input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
 
+  .field-row.list-row .label-input {
+    flex: 1; font: inherit; font-size: 13.5px; padding: 6px 10px; min-width: 0;
+    border: 1px solid var(--line-strong); border-radius: 7px;
+    background: var(--paper); color: var(--ink);
+  }
+  .btn-remove-row {
+    appearance: none; cursor: pointer; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; font-size: 15px; line-height: 1;
+    border: 1px solid var(--line-strong); background: var(--paper-raised); color: var(--ink-faint);
+  }
+  .btn-remove-row:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-add-row {
+    appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 12.5px;
+    width: 100%; margin-top: 8px; padding: 7px 12px; border-radius: 7px;
+    border: 1px dashed var(--line-strong); background: none; color: var(--accent);
+  }
+  .btn-add-row:hover { border-color: var(--accent); background: var(--accent-soft); }
+
   .split-control { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
   .split-control input[type="range"] { flex: 1; accent-color: var(--accent); }
   .split-control .pct-readout {
@@ -506,35 +525,9 @@
   var DEFAULTS = {
     netto: 0,
     splitPercent: 50,
-    revolut: [
-      { label: "Lebensmittel", value: 0 },
-      { label: "Ausgehen", value: 0 },
-      { label: "Kleidung", value: 0 },
-      { label: "KFZ Vers.", value: 0 },
-      { label: "AMEX", value: 0 },
-      { label: "DB Ticket", value: 0 },
-      { label: "Frisör", value: 0 },
-      { label: "Tanken", value: 0 },
-      { label: "Medikamente", value: 0 },
-      { label: "Sky", value: 0 },
-      { label: "Dazn", value: 0 },
-      { label: "Apple Care", value: 0 },
-      { label: "Revolut", value: 0 },
-      { label: "Spotify", value: 0 },
-      { label: "Gothaer Vers.", value: 0 },
-      { label: "Miles and More", value: 0 },
-      { label: "AXA Vers.", value: 0 },
-      { label: "Amazon", value: 0 },
-      { label: "iCloud", value: 0 },
-      { label: "FCB", value: 0 }
-    ],
-    traderepublic: [
-      { label: "Tagesgeld", value: 0 },
-      { label: "TR Sparpläne", value: 0 }
-    ],
-    sonstiges: [
-      { label: "Miete", value: 0 }
-    ],
+    revolut: [],
+    traderepublic: [],
+    sonstiges: [],
     rent: { kaltmiete: 0, heizkosten: 0, betriebskosten: 0, strom: 0, internet: 0, gez: 0, hausrat: 0 },
     extra: { ammerlaender: 0 },
     vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
@@ -551,10 +544,10 @@
       if (typeof saved.netto === "number") base.netto = saved.netto;
       if (typeof saved.splitPercent === "number") base.splitPercent = saved.splitPercent;
       ["revolut", "traderepublic", "sonstiges"].forEach(function (key) {
-        if (Array.isArray(saved[key]) && saved[key].length === base[key].length) {
-          saved[key].forEach(function (item, i) {
-            if (item && typeof item.value === "number") base[key][i].value = item.value;
-          });
+        if (Array.isArray(saved[key])) {
+          base[key] = saved[key]
+            .filter(function (item) { return item && typeof item === "object"; })
+            .map(function (item) { return { label: typeof item.label === "string" ? item.label : "", value: num(item.value) }; });
         }
       });
       if (saved.rent) Object.keys(base.rent).forEach(function (k) { if (typeof saved.rent[k] === "number") base.rent[k] = saved.rent[k]; });
@@ -717,15 +710,16 @@
 
     function ledgerCard(title, items, sum) {
       var rows = items.map(function (it) {
-        return '<div class="ledger-row"><span>' + esc(it.label) + '</span><span class="val">' + eur(it.value) + '</span></div>';
+        return '<div class="ledger-row"><span>' + esc(it.label || "(ohne Bezeichnung)") + '</span><span class="val">' + eur(it.value) + '</span></div>';
       }).join("");
+      if (!items.length) rows = '<p class="subtle" style="margin:0 0 8px">Noch keine Einträge.</p>';
       return '<div class="card"><h2>' + title + '</h2>' + rows +
         '<div class="ledger-total"><span>Insgesamt</span><span class="val">' + eur(sum) + '</span></div></div>';
     }
 
     var ledgerGrid = '<div class="ledger-grid">' +
-      ledgerCard("Ausgaben (Revolut)", s.revolut, c.revolutSum) +
-      ledgerCard("Sparen (Trade Republic)", s.traderepublic, c.trSum) +
+      ledgerCard("Ausgaben", s.revolut, c.revolutSum) +
+      ledgerCard("Sparen", s.traderepublic, c.trSum) +
       ledgerCard("Sonstiges", s.sonstiges, c.sonstigesSum) +
       '</div>';
 
@@ -804,16 +798,21 @@
 
     function listCard(id, title, items, pathPrefix) {
       var rows = items.map(function (it, i) {
-        return '<div class="field-row"><label>' + esc(it.label) + '</label><div class="input-euro">' +
-          inputField(pathPrefix + "." + i + ".value", it.value) + '</div></div>';
+        return '<div class="field-row list-row">' +
+          '<input type="text" class="label-input" data-bind-text="' + pathPrefix + '.' + i + '.label" value="' + esc(it.label) + '" placeholder="Bezeichnung">' +
+          '<div class="input-euro">' + inputField(pathPrefix + "." + i + ".value", it.value) + '</div>' +
+          '<button type="button" class="btn-remove-row" data-remove-list="' + pathPrefix + '" data-remove-index="' + i + '" aria-label="Position entfernen">&times;</button>' +
+        '</div>';
       }).join("");
-      return '<div class="card"><h2>' + title + '</h2>' + rows +
+      var empty = items.length ? "" : '<p class="subtle" style="margin:0 0 10px">Noch keine Einträge &ndash; füge unten deine eigenen hinzu.</p>';
+      return '<div class="card"><h2>' + title + '</h2>' + empty + rows +
+        '<button type="button" class="btn-add-row" data-add-list="' + pathPrefix + '">+ Position hinzufügen</button>' +
         '<div class="calc-line total"><span>Insgesamt</span><span class="val" id="calc-' + id + 'Sum"></span></div></div>';
     }
 
     var ledgerGrid = '<div class="ledger-grid">' +
-      listCard("revolut", "Ausgaben (Revolut)", s.revolut, "revolut") +
-      listCard("tr", "Sparen (Trade Republic)", s.traderepublic, "traderepublic") +
+      listCard("revolut", "Ausgaben", s.revolut, "revolut") +
+      listCard("tr", "Sparen", s.traderepublic, "traderepublic") +
       listCard("sonstiges", "Sonstiges", s.sonstiges, "sonstiges") +
       '</div>';
 
@@ -864,6 +863,34 @@
         setPath(state, input.getAttribute("data-bind"), num(input.value));
         render();
         saveState();
+      });
+    });
+    el.querySelectorAll("input[data-bind-text]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        setPath(state, input.getAttribute("data-bind-text"), input.value);
+        render();
+        saveState();
+      });
+    });
+    el.querySelectorAll(".btn-remove-row").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var list = btn.getAttribute("data-remove-list");
+        var idx = parseInt(btn.getAttribute("data-remove-index"), 10);
+        getPath(state, list).splice(idx, 1);
+        buildRechner(state);
+        render();
+        saveState();
+      });
+    });
+    el.querySelectorAll(".btn-add-row").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var list = btn.getAttribute("data-add-list");
+        getPath(state, list).push({ label: "", value: 0 });
+        buildRechner(state);
+        render();
+        saveState();
+        var inputs = el.querySelectorAll('[data-bind-text^="' + list + '."]');
+        if (inputs.length) inputs[inputs.length - 1].focus();
       });
     });
     document.getElementById("split-range").addEventListener("input", function (e) {
