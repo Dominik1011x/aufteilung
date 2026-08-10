@@ -260,8 +260,8 @@
     font-variant-numeric: tabular-nums;
   }
 
-  table.rent-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  table.rent-table th {
+  table.data-table { width: auto; min-width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.data-table th {
     text-align: right;
     font-size: 11px;
     text-transform: uppercase;
@@ -269,26 +269,41 @@
     color: var(--ink-faint);
     font-weight: 600;
     padding: 0 0 8px;
+    white-space: nowrap;
   }
-  table.rent-table th:first-child, table.rent-table td:first-child { text-align: left; }
-  table.rent-table td {
-    padding: 7px 0;
+  table.data-table th:first-child, table.data-table td:first-child { text-align: left; }
+  table.data-table td {
+    padding: 7px 14px 7px 0;
     border-top: 1px solid var(--line);
     text-align: right;
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
-  table.rent-table td.label {
+  table.data-table td.label {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--ink-soft);
   }
-  table.rent-table tr.subtotal td { font-weight: 700; color: var(--ink); border-top: 1px solid var(--line-strong); }
-  table.rent-table tr.subtotal td.label { color: var(--ink); }
-  table.rent-table tr.grandtotal td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--line-strong); padding-top: 10px; }
-  table.rent-table .col-mine { color: var(--accent); }
-  table.rent-table .col-partner { color: var(--accent2); }
+  table.data-table tr.subtotal td { font-weight: 700; color: var(--ink); border-top: 1px solid var(--line-strong); }
+  table.data-table tr.subtotal td.label { color: var(--ink); }
+  table.data-table tr.grandtotal td { font-weight: 700; color: var(--ink); border-top: 2px solid var(--line-strong); padding-top: 10px; }
+  table.data-table .col-mine { color: var(--accent); }
+  table.data-table .col-partner { color: var(--accent2); }
+  .col-pos { color: var(--accent); }
+  .col-neg { color: var(--accent2); }
+  table.data-table td.cell-remove { text-align: right; padding-left: 8px; width: 1%; }
   .split-hint { font-size: 11px; font-weight: 400; color: var(--ink-faint); }
   .overflow-wrap { overflow-x: auto; }
+  .miles-value-input { padding: 6px 10px; }
+  .miles-row-extra { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--ink-soft); }
+  .miles-row-extra input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); }
+  .miles-entry-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .miles-entry-form input[type="date"] { font: inherit; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--paper); color: var(--ink); }
+  .btn-save-entry {
+    appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
+    border: none; background: var(--accent); color: var(--accent-ink);
+    padding: 8px 16px; border-radius: 8px;
+  }
 
   .split-bar { display: flex; height: 34px; border-radius: 8px; overflow: hidden; margin-top: 16px; border: 1px solid var(--line); }
   .split-bar .seg {
@@ -516,6 +531,7 @@
     <nav class="mode-switch" role="tablist" aria-label="Ansicht wählen">
       <button type="button" data-mode="dashboard" class="active" role="tab" aria-selected="true">Übersicht</button>
       <button type="button" data-mode="rechner" role="tab" aria-selected="false">Rechner</button>
+      <button type="button" data-mode="meilen" role="tab" aria-selected="false">Meilen</button>
     </nav>
     <div class="account-chip">
       <span class="account-email" id="account-email"></span>
@@ -526,6 +542,7 @@
   <main>
     <section id="view-dashboard" class="view active" aria-label="Übersicht"></section>
     <section id="view-rechner" class="view" aria-label="Rechner"></section>
+    <section id="view-meilen" class="view" aria-label="Meilen"></section>
   </main>
 
   <footer class="savebar"><span class="dot-live" aria-hidden="true"></span> <span id="sync-status">Verbunden</span> &ndash; Änderungen werden geräteübergreifend synchronisiert.</footer>
@@ -590,7 +607,8 @@
       { label: "GEZ", value: 0, split: 50, freq: "monthly" },
       { label: "Hausrat", value: 0, split: 50, freq: "monthly" }
     ],
-    vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 }
+    vodafone: { total: 0, gutschein: 0, cashback: 0, monate: 24 },
+    miles: { providers: [], entries: [] }
   };
 
   function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -600,6 +618,12 @@
   function pct1(n) { return (n * 100).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %"; }
   function normFreq(f) { return f === "yearly" ? "yearly" : "monthly"; }
   function monthlyValue(it) { return normFreq(it.freq) === "yearly" ? num(it.value) / 12 : num(it.value); }
+  function uid() { return crypto.randomUUID(); }
+  function intFmt(n) { return Math.round(num(n)).toLocaleString("de-DE"); }
+  function formatDateDe(iso) {
+    var parts = String(iso).split("-");
+    return parts.length === 3 ? parts[2] + "." + parts[1] + "." + parts[0] : iso;
+  }
 
   function mergeState(base, saved) {
     if (saved && typeof saved === "object") {
@@ -615,6 +639,25 @@
         base.rent = migrateRent(saved);
       }
       if (saved.vodafone) Object.keys(base.vodafone).forEach(function (k) { if (typeof saved.vodafone[k] === "number") base.vodafone[k] = saved.vodafone[k]; });
+
+      if (saved.miles && typeof saved.miles === "object") {
+        base.miles.providers = Array.isArray(saved.miles.providers)
+          ? saved.miles.providers
+              .filter(function (p) { return p && typeof p === "object"; })
+              .map(function (p) { return { id: typeof p.id === "string" ? p.id : uid(), label: typeof p.label === "string" ? p.label : "", excludeFromTotal: !!p.excludeFromTotal }; })
+          : [];
+        base.miles.entries = Array.isArray(saved.miles.entries)
+          ? saved.miles.entries
+              .filter(function (e) { return e && typeof e === "object" && typeof e.date === "string"; })
+              .map(function (e) {
+                var values = {};
+                if (e.values && typeof e.values === "object") {
+                  Object.keys(e.values).forEach(function (k) { values[k] = num(e.values[k]); });
+                }
+                return { id: typeof e.id === "string" ? e.id : uid(), date: e.date, values: values };
+              })
+          : [];
+      }
 
       if (saved.partner && typeof saved.partner === "object") {
         base.partner.enabled = !!saved.partner.enabled;
@@ -767,6 +810,39 @@
     };
   }
 
+  function computeMiles(m) {
+    var providers = m.providers;
+    var entriesSorted = m.entries.slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+    var latest = entriesSorted.length ? entriesSorted[entriesSorted.length - 1] : null;
+    var previous = entriesSorted.length > 1 ? entriesSorted[entriesSorted.length - 2] : null;
+
+    function totalFor(entry) {
+      if (!entry) return 0;
+      return providers.reduce(function (sum, p) {
+        return p.excludeFromTotal ? sum : sum + num(entry.values[p.id]);
+      }, 0);
+    }
+
+    var latestTotal = totalFor(latest);
+    var previousTotal = totalFor(previous);
+
+    var rows = providers.map(function (p) {
+      var curVal = latest && latest.values[p.id] !== undefined ? num(latest.values[p.id]) : null;
+      var prevVal = previous && previous.values[p.id] !== undefined ? num(previous.values[p.id]) : null;
+      var diff = curVal !== null && prevVal !== null ? curVal - prevVal : null;
+      return { id: p.id, label: p.label, excludeFromTotal: p.excludeFromTotal, current: curVal, previous: prevVal, diff: diff };
+    });
+
+    return {
+      providers: providers, entriesSorted: entriesSorted, latest: latest, previous: previous,
+      latestTotal: latestTotal, previousTotal: previousTotal,
+      totalDiff: latest && previous ? latestTotal - previousTotal : null,
+      rows: rows
+    };
+  }
+
   function esc(str) {
     return String(str).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
@@ -873,7 +949,7 @@
       '<div class="card">' +
         '<h2>Zusammensetzung Miete</h2>' +
         '<p class="subtle">' + subtitle + '</p>' +
-        '<div class="overflow-wrap"><table class="rent-table">' +
+        '<div class="overflow-wrap"><table class="data-table">' +
           theadRow +
           rentRowsHtml +
           row("Gesamt", c.mieteGesamt, c.meineMiete, c.partnerMiete, "grandtotal") +
@@ -1082,6 +1158,7 @@
     document.getElementById("btn-reset").addEventListener("click", function () {
       state = deepClone(DEFAULTS);
       buildRechner(state);
+      buildMeilen(state);
       render();
       saveState();
     });
@@ -1123,6 +1200,169 @@
     }
   }
 
+  /* ---------- Meilen ---------- */
+
+  function milesOverviewCard(mc) {
+    if (!mc.latest) {
+      return '<div class="card"><h2>Aktueller Stand</h2><p class="subtle" style="margin:0">Noch kein Stand erfasst &ndash; trag oben deinen ersten Stand ein.</p></div>';
+    }
+    var rows = mc.rows.map(function (r) {
+      var diffHtml = "";
+      if (r.diff !== null && r.diff !== 0) {
+        diffHtml = ' <span class="split-hint ' + (r.diff > 0 ? "col-pos" : "col-neg") + '">(' + (r.diff > 0 ? "+" : "") + intFmt(r.diff) + ')</span>';
+      }
+      return '<div class="calc-line"><span>' + esc(r.label || "Ohne Namen") + (r.excludeFromTotal ? ' <span class="subtle">(nicht in Summe)</span>' : "") + '</span>' +
+        '<span class="val">' + (r.current === null ? "&ndash;" : intFmt(r.current)) + diffHtml + '</span></div>';
+    }).join("");
+    var totalDiffHtml = "";
+    if (mc.totalDiff !== null && mc.totalDiff !== 0) {
+      totalDiffHtml = ' <span class="split-hint ' + (mc.totalDiff > 0 ? "col-pos" : "col-neg") + '">(' + (mc.totalDiff > 0 ? "+" : "") + intFmt(mc.totalDiff) + ')</span>';
+    }
+    return '<div class="card">' +
+      '<h2>Aktueller Stand</h2>' +
+      '<p class="subtle" style="margin:0 0 10px">Stand vom ' + formatDateDe(mc.latest.date) + (mc.previous ? " &middot; vorher " + formatDateDe(mc.previous.date) : "") + '</p>' +
+      rows +
+      '<div class="calc-line total"><span>Gesamt</span><span class="val">' + intFmt(mc.latestTotal) + totalDiffHtml + '</span></div>' +
+    '</div>';
+  }
+
+  function milesHistoryCard(mc) {
+    if (!mc.entriesSorted.length) return "";
+    var providers = mc.providers;
+    var theadCols = providers.map(function (p) { return '<th>' + esc(p.label || "–") + '</th>'; }).join("");
+    var rowsHtml = mc.entriesSorted.slice().reverse().map(function (entry) {
+      var cols = providers.map(function (p) {
+        var v = entry.values[p.id];
+        return '<td>' + (v === undefined ? '<span class="subtle">&ndash;</span>' : intFmt(v)) + '</td>';
+      }).join("");
+      var total = providers.reduce(function (sum, p) { return p.excludeFromTotal ? sum : sum + num(entry.values[p.id]); }, 0);
+      return '<tr>' +
+        '<td class="label">' + formatDateDe(entry.date) + '</td>' +
+        cols +
+        '<td>' + intFmt(total) + '</td>' +
+        '<td class="cell-remove"><button type="button" class="btn-remove-row" data-remove-entry="' + esc(entry.id) + '" aria-label="Eintrag entfernen">&times;</button></td>' +
+      '</tr>';
+    }).join("");
+    return '<div class="card">' +
+      '<h2>Verlauf</h2>' +
+      '<div class="overflow-wrap"><table class="data-table">' +
+        '<thead><tr><th>Datum</th>' + theadCols + '<th>Gesamt</th><th></th></tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table></div>' +
+    '</div>';
+  }
+
+  function updateMeilenSummary(s) {
+    var wrap = document.getElementById("miles-summary");
+    if (!wrap) return;
+    var mc = computeMiles(s.miles);
+    wrap.innerHTML = milesOverviewCard(mc) + milesHistoryCard(mc);
+    wrap.querySelectorAll("[data-remove-entry]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-remove-entry");
+        state.miles.entries = state.miles.entries.filter(function (e) { return e.id !== id; });
+        saveState();
+        updateMeilenSummary(state);
+      });
+    });
+  }
+
+  function buildMeilen(s) {
+    var el = document.getElementById("view-meilen");
+    var mc = computeMiles(s.miles);
+
+    var toolbar =
+      '<div class="toolbar">' +
+        '<span class="hint">Meilen &amp; Punkte deiner Vielfliegerprogramme im Blick behalten.</span>' +
+      '</div>';
+
+    var providerRows = s.miles.providers.map(function (p, i) {
+      var curVal = mc.latest && mc.latest.values[p.id] !== undefined ? mc.latest.values[p.id] : 0;
+      return '<div class="list-item">' +
+        '<div class="field-row list-row">' +
+          '<input type="text" class="label-input" data-bind-text="miles.providers.' + i + '.label" value="' + esc(p.label) + '" placeholder="Anbieter">' +
+          '<input type="number" step="1" inputmode="numeric" class="miles-value-input" data-provider-id="' + esc(p.id) + '" value="' + num(curVal) + '">' +
+          '<button type="button" class="btn-remove-row" data-remove-list="miles.providers" data-remove-index="' + i + '" aria-label="Anbieter entfernen">&times;</button>' +
+        '</div>' +
+        '<label class="miles-row-extra"><input type="checkbox" class="miles-exclude-checkbox" data-provider-index="' + i + '"' + (p.excludeFromTotal ? " checked" : "") + '> Aus Gesamtsumme ausschließen</label>' +
+      '</div>';
+    }).join("");
+
+    var providerEmpty = s.miles.providers.length ? "" : '<p class="subtle" style="margin:0 0 10px">Noch keine Anbieter &ndash; füge unten deine eigenen hinzu.</p>';
+    var todayIso = new Date().toISOString().slice(0, 10);
+
+    var entryForm = s.miles.providers.length
+      ? '<div class="miles-entry-form">' +
+          '<label for="miles-entry-date" class="subtle">Stand vom</label>' +
+          '<input type="date" id="miles-entry-date" value="' + todayIso + '">' +
+          '<button type="button" class="btn-save-entry" id="btn-save-miles-entry">Stand speichern</button>' +
+        '</div>'
+      : "";
+
+    var providerCard =
+      '<div class="card">' +
+        '<h2>Meilenstände</h2>' +
+        providerEmpty + providerRows +
+        '<button type="button" class="btn-add-row" data-add-list="miles.providers">+ Anbieter hinzufügen</button>' +
+        entryForm +
+      '</div>';
+
+    el.innerHTML = toolbar + providerCard + '<div id="miles-summary"></div>';
+
+    el.querySelectorAll('input[data-bind-text^="miles.providers."]').forEach(function (input) {
+      input.addEventListener("input", function () {
+        setPath(state, input.getAttribute("data-bind-text"), input.value);
+        saveState();
+        updateMeilenSummary(state);
+      });
+    });
+    el.querySelectorAll(".miles-exclude-checkbox").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        var idx = parseInt(checkbox.getAttribute("data-provider-index"), 10);
+        state.miles.providers[idx].excludeFromTotal = checkbox.checked;
+        saveState();
+        updateMeilenSummary(state);
+      });
+    });
+    el.querySelectorAll('.btn-remove-row[data-remove-list="miles.providers"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.getAttribute("data-remove-index"), 10);
+        state.miles.providers.splice(idx, 1);
+        buildMeilen(state);
+        saveState();
+      });
+    });
+    el.querySelector('[data-add-list="miles.providers"]').addEventListener("click", function () {
+      state.miles.providers.push({ id: uid(), label: "", excludeFromTotal: false });
+      buildMeilen(state);
+      saveState();
+      var inputs = el.querySelectorAll('[data-bind-text^="miles.providers."]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    var saveBtn = document.getElementById("btn-save-miles-entry");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        var dateVal = document.getElementById("miles-entry-date").value;
+        if (!dateVal) return;
+        var values = {};
+        el.querySelectorAll(".miles-value-input").forEach(function (input) {
+          values[input.getAttribute("data-provider-id")] = num(input.value);
+        });
+        var existing = state.miles.entries.filter(function (e) { return e.date === dateVal; })[0];
+        if (existing) {
+          existing.values = values;
+        } else {
+          state.miles.entries.push({ id: uid(), date: dateVal, values: values });
+        }
+        buildMeilen(state);
+        saveState();
+      });
+    }
+
+    updateMeilenSummary(s);
+  }
+
   function render() {
     var c = computeAll(state);
     renderDashboard(state, c);
@@ -1142,6 +1382,7 @@
       var mode = btn.getAttribute("data-mode");
       document.getElementById("view-dashboard").classList.toggle("active", mode === "dashboard");
       document.getElementById("view-rechner").classList.toggle("active", mode === "rechner");
+      document.getElementById("view-meilen").classList.toggle("active", mode === "meilen");
     });
   });
 
@@ -1256,6 +1497,7 @@
     currentUserId = user.id;
     document.getElementById("account-email").textContent = user.email || "";
     buildRechner(state);
+    buildMeilen(state);
     render();
     subscribeRealtime(user.id);
     showScreen("app");
