@@ -1,6 +1,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gehalt & Mietaufteilung</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6f62">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aufteilung">
 <style>
   :root {
     --paper: #f5f3ee;
@@ -532,7 +538,12 @@
   var SUPABASE_URL = "https://fqaqdxvlzzclxzgqsdgl.supabase.co";
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxYXFkeHZsenpjbHh6Z3FzZGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODMxMTMsImV4cCI6MjEwMTg1OTExM30.9KSGMIsN4Luw3iT73prrKrdqpef1mgNsZqOT0xG3lgM";
 
-  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  /* persistSession + autoRefreshToken sorgen dafür, dass man auf diesem Gerät
+     angemeldet bleibt (Session landet im localStorage und wird automatisch
+     erneuert), statt sich bei jedem Öffnen neu einloggen zu müssen. */
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
   var remoteUpdatedAt = null;
   var saveTimer = null;
   var currentUserId = null;
@@ -1239,5 +1250,11 @@
       showScreen("auth");
     }
   });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js");
+    });
+  }
 })();
 </script>
