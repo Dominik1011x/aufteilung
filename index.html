@@ -92,18 +92,23 @@
     line-height: 1.5;
   }
 
-  .app { max-width: 980px; margin: 0 auto; padding: 0 20px 64px; }
+  .app { max-width: 980px; margin: 0 auto; padding: var(--topbar-space, 150px) 20px 64px; }
 
   .topbar {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 10;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: calc(22px + env(safe-area-inset-top)) 0 18px;
+    padding: calc(22px + env(safe-area-inset-top)) 20px 18px;
+    max-width: 980px;
+    margin: 0 auto;
     background: var(--paper);
+    border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
   }
 
@@ -530,6 +535,24 @@
 <script>
 (function () {
   "use strict";
+
+  /* .topbar ist fixed positioniert, damit er beim Scrollen wirklich fest
+     stehen bleibt. Da fixed-Elemente aus dem normalen Layoutfluss genommen
+     werden, muss .app entsprechend Platz oben freihalten - die Höhe des
+     Topbars kann variieren (Zeilenumbruch bei langer E-Mail o.ä.), daher
+     wird sie live gemessen statt fest verdrahtet. */
+  var topbarEl = document.querySelector(".topbar");
+  if (topbarEl) {
+    var syncTopbarSpace = function () {
+      document.documentElement.style.setProperty("--topbar-space", topbarEl.getBoundingClientRect().height + "px");
+    };
+    syncTopbarSpace();
+    if (window.ResizeObserver) {
+      new ResizeObserver(syncTopbarSpace).observe(topbarEl);
+    } else {
+      window.addEventListener("resize", syncTopbarSpace);
+    }
+  }
 
   /* Diese Werte sind bewusst öffentlich im Code: der "anon key" ist für den
      Einsatz im Browser gedacht. Der eigentliche Zugriffsschutz läuft über Supabase
@@ -1130,6 +1153,11 @@
     document.getElementById("loading-screen").classList.toggle("hidden", name !== "loading");
     document.getElementById("auth-screen").classList.toggle("hidden", name !== "auth");
     document.getElementById("app").classList.toggle("hidden", name !== "app");
+    /* ResizeObserver bekommt den Sprung von display:none auf sichtbar nicht
+       zuverlässig mit, daher hier nach dem Umschalten einmal neu vermessen. */
+    if (name === "app" && typeof syncTopbarSpace === "function") {
+      requestAnimationFrame(syncTopbarSpace);
+    }
   }
 
   function clearAuthMessage() {
