@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gehalt & Mietaufteilung</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2f6f62">
@@ -102,8 +102,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 22px 0 18px;
-    background: linear-gradient(var(--paper) 82%, transparent);
+    padding: calc(22px + env(safe-area-inset-top)) 0 18px;
+    background: var(--paper);
     flex-wrap: wrap;
   }
 
