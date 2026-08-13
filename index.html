@@ -532,12 +532,19 @@
   .list-move { display: flex; flex-direction: column; flex: none; gap: 4px; }
   .list-move button {
     appearance: none; cursor: pointer;
-    width: 28px; height: 19px; padding: 0;
+    width: 30px; height: 21px; padding: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 700; line-height: 1;
     border: 1px solid var(--line-strong); background: var(--field-bg); color: var(--ink);
     border-radius: 3px;
+    /* touch-action verhindert, dass ein Tipp erst als Scroll-Geste gewertet
+       wird - auf iOS kann das sonst dazu führen, dass der erste Tipp auf
+       einen frisch sichtbaren Knopf ins Leere geht. */
+    touch-action: manipulation;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  @media (pointer: coarse) {
+    .list-move button { width: 34px; height: 24px; font-size: 13px; }
   }
   .list-move button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .list-move button:disabled { opacity: 0.3; cursor: default; }
