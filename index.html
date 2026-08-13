@@ -591,7 +591,14 @@
   .auth-submit:hover { filter: brightness(1.07); }
   .auth-submit:active { transform: translateY(1px); }
   .auth-submit:disabled { opacity: 0.5; cursor: default; filter: none; }
-  .auth-switch { text-align: center; font-size: 13px; color: var(--ink-faint); margin-top: 18px; }
+  .auth-forgot { text-align: center; margin-top: 14px; }
+  .auth-forgot button {
+    appearance: none; border: none; background: none; cursor: pointer;
+    font: inherit; font-size: 12.5px; color: var(--ink-soft); padding: 0;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .auth-forgot button:hover { color: var(--accent); }
+  .auth-switch { text-align: center; font-size: 13px; color: var(--ink-faint); margin-top: 14px; }
   .auth-switch button { appearance: none; border: none; background: none; cursor: pointer; font: inherit; font-weight: 700; color: var(--accent); padding: 0; }
   .auth-message { font-size: 13px; border-radius: var(--field-radius); padding: 10px 12px; margin-bottom: 14px; background: var(--rest-soft); color: var(--ink); }
   .auth-message.error { background: var(--accent2-soft); color: var(--accent2); }
@@ -639,16 +646,23 @@
     <p class="auth-sub" id="auth-sub">Melde dich an, um dein privates Haushaltsbuch zu öffnen.</p>
     <div id="auth-message-slot"></div>
     <form id="auth-form">
-      <div class="auth-field">
+      <div class="auth-field" id="auth-email-field">
         <label for="auth-email">E-Mail</label>
         <input type="email" id="auth-email" autocomplete="email" required>
       </div>
-      <div class="auth-field">
+      <div class="auth-field" id="auth-password-field">
         <label for="auth-password">Passwort</label>
         <input type="password" id="auth-password" autocomplete="current-password" required minlength="6">
       </div>
+      <div class="auth-field hidden" id="auth-newpass-field">
+        <label for="auth-newpass">Neues Passwort</label>
+        <input type="password" id="auth-newpass" autocomplete="new-password" minlength="6">
+      </div>
       <button type="submit" class="auth-submit" id="auth-submit">Anmelden</button>
     </form>
+    <div class="auth-forgot" id="auth-forgot-row">
+      <button type="button" id="auth-forgot-btn">Passwort vergessen?</button>
+    </div>
     <div class="auth-switch">
       <span id="auth-switch-text">Noch kein Konto?</span>
       <button type="button" id="auth-switch-btn">Registrieren</button>
@@ -703,6 +717,20 @@
     } else {
       window.addEventListener("resize", syncTopbarSpace);
     }
+  }
+
+  /* Die Hash-Parameter müssen gelesen werden, bevor der Supabase-Client startet:
+     der räumt die URL nach dem Verarbeiten eines Magic Links selbst auf, danach
+     wäre nicht mehr erkennbar, dass es ein Passwort-Reset war. Nicht selbst
+     löschen - der Client braucht den Hash noch, um die Session aufzubauen. */
+  var urlHashParams = new URLSearchParams(String(window.location.hash || "").replace(/^#/, ""));
+  var recoveryActive = urlHashParams.get("type") === "recovery";
+  var urlAuthError = urlHashParams.get("error_description") || urlHashParams.get("error");
+
+  /* Ziel für den Link aus der Reset-Mail: immer diese Seite, egal ob sie unter
+     einer Domain oder einem Unterpfad liegt. */
+  function appUrl() {
+    return window.location.origin + window.location.pathname;
   }
 
   /* Diese Werte sind bewusst öffentlich im Code: der "anon key" ist für den
@@ -1548,36 +1576,102 @@
     slot.appendChild(div);
   }
 
+  /* Vier Zustände teilen sich ein Formular: anmelden, registrieren, Reset-Link
+     anfordern und - nach dem Klick auf den Link aus der Mail - das neue Passwort
+     vergeben. Pro Zustand ist nur hinterlegt, was sichtbar ist und wie es heißt. */
+  var AUTH_VIEWS = {
+    signin: {
+      title: "Anmelden",
+      sub: "Melde dich an, um dein privates Haushaltsbuch zu öffnen.",
+      submit: "Anmelden",
+      fields: ["email", "password"],
+      forgot: true,
+      switchText: "Noch kein Konto?",
+      switchBtn: "Registrieren"
+    },
+    signup: {
+      title: "Konto erstellen",
+      sub: "Registriere dich, um dein eigenes, privates Haushaltsbuch anzulegen.",
+      submit: "Registrieren",
+      fields: ["email", "password"],
+      forgot: false,
+      switchText: "Schon ein Konto?",
+      switchBtn: "Anmelden"
+    },
+    reset: {
+      title: "Passwort zurücksetzen",
+      sub: "Trag deine E-Mail-Adresse ein. Wir schicken dir einen Link, mit dem du ein neues Passwort vergeben kannst.",
+      submit: "Link schicken",
+      fields: ["email"],
+      forgot: false,
+      switchText: "Doch wieder eingefallen?",
+      switchBtn: "Zurück zur Anmeldung"
+    },
+    recovery: {
+      title: "Neues Passwort",
+      sub: "Vergib jetzt ein neues Passwort für dein Konto – mindestens 6 Zeichen.",
+      submit: "Passwort speichern",
+      fields: ["newpass"],
+      forgot: false,
+      switchText: "Lieber doch nicht?",
+      switchBtn: "Abbrechen"
+    }
+  };
+
+  var AUTH_FIELDS = {
+    email: { wrap: "auth-email-field", input: "auth-email" },
+    password: { wrap: "auth-password-field", input: "auth-password" },
+    newpass: { wrap: "auth-newpass-field", input: "auth-newpass" }
+  };
+
   function setAuthMode(mode) {
-    authMode = mode;
+    authMode = AUTH_VIEWS[mode] ? mode : "signin";
+    var view = AUTH_VIEWS[authMode];
     clearAuthMessage();
     document.getElementById("auth-password").value = "";
-    if (mode === "signup") {
-      document.getElementById("auth-title").textContent = "Konto erstellen";
-      document.getElementById("auth-sub").textContent = "Registriere dich, um dein eigenes, privates Haushaltsbuch anzulegen.";
-      document.getElementById("auth-submit").textContent = "Registrieren";
-      document.getElementById("auth-switch-text").textContent = "Schon ein Konto?";
-      document.getElementById("auth-switch-btn").textContent = "Anmelden";
-    } else {
-      document.getElementById("auth-title").textContent = "Anmelden";
-      document.getElementById("auth-sub").textContent = "Melde dich an, um dein privates Haushaltsbuch zu öffnen.";
-      document.getElementById("auth-submit").textContent = "Anmelden";
-      document.getElementById("auth-switch-text").textContent = "Noch kein Konto?";
-      document.getElementById("auth-switch-btn").textContent = "Registrieren";
-    }
+    document.getElementById("auth-newpass").value = "";
+
+    Object.keys(AUTH_FIELDS).forEach(function (key) {
+      var ref = AUTH_FIELDS[key];
+      var visible = view.fields.indexOf(key) !== -1;
+      document.getElementById(ref.wrap).classList.toggle("hidden", !visible);
+      /* required nur an sichtbaren Feldern setzen: ein ausgeblendetes Pflichtfeld
+         blockiert das Absenden, ohne dass der Browser es anspringen könnte. */
+      document.getElementById(ref.input).required = visible;
+    });
+
+    document.getElementById("auth-title").textContent = view.title;
+    document.getElementById("auth-sub").textContent = view.sub;
+    document.getElementById("auth-submit").textContent = view.submit;
+    document.getElementById("auth-switch-text").textContent = view.switchText;
+    document.getElementById("auth-switch-btn").textContent = view.switchBtn;
+    document.getElementById("auth-forgot-row").classList.toggle("hidden", !view.forgot);
   }
 
   function translateAuthError(err) {
     var msg = (err && err.message) || "";
+    /* Die Link-Prüfung muss vor die E-Mail-Prüfung: "Email link is invalid or has
+       expired" enthält beides und würde sonst als Tippfehler in der Adresse gedeutet. */
+    if (/(link|token|otp)/i.test(msg) && /(expired|invalid)/i.test(msg)) return "Der Link ist abgelaufen oder wurde schon benutzt. Fordere bitte einen neuen an.";
+    if (/auth session missing/i.test(msg)) return "Die Sitzung ist abgelaufen. Bitte fordere einen neuen Link an.";
     if (/already registered/i.test(msg)) return "Für diese E-Mail existiert bereits ein Konto. Bitte stattdessen anmelden.";
     if (/invalid login credentials/i.test(msg)) return "E-Mail oder Passwort ist falsch.";
+    if (/new password should be different/i.test(msg)) return "Das neue Passwort muss sich vom bisherigen unterscheiden.";
+    if (/only request this after/i.test(msg)) return "Zu viele Versuche in kurzer Zeit. Bitte warte einen Moment und probiere es dann erneut.";
     if (/password/i.test(msg) && /(6|least)/i.test(msg)) return "Das Passwort muss mindestens 6 Zeichen lang sein.";
     if (/email/i.test(msg) && /invalid/i.test(msg)) return "Bitte eine gültige E-Mail-Adresse angeben.";
     return msg || "Etwas ist schiefgelaufen. Bitte erneut versuchen.";
   }
 
   document.getElementById("auth-switch-btn").addEventListener("click", function () {
+    /* Im Recovery-Modus hängt eine gültige Sitzung aus dem Mail-Link am Client.
+       Abmelden verwirft sie, der SIGNED_OUT-Handler bringt uns zurück zum Login. */
+    if (authMode === "recovery") { sb.auth.signOut(); return; }
     setAuthMode(authMode === "signin" ? "signup" : "signin");
+  });
+
+  document.getElementById("auth-forgot-btn").addEventListener("click", function () {
+    setAuthMode("reset");
   });
 
   document.getElementById("auth-form").addEventListener("submit", function (e) {
@@ -1585,18 +1679,40 @@
     clearAuthMessage();
     var email = document.getElementById("auth-email").value.trim();
     var password = document.getElementById("auth-password").value;
+    var newPassword = document.getElementById("auth-newpass").value;
     var submitBtn = document.getElementById("auth-submit");
+    /* Modus festhalten: setAuthMode() im Erfolgsfall verändert ihn sonst mitten
+       in der Auswertung. */
+    var mode = authMode;
     submitBtn.disabled = true;
 
-    var request = authMode === "signup"
-      ? sb.auth.signUp({ email: email, password: password })
-      : sb.auth.signInWithPassword({ email: email, password: password });
+    var request;
+    if (mode === "signup") request = sb.auth.signUp({ email: email, password: password });
+    else if (mode === "reset") request = sb.auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+    else if (mode === "recovery") request = sb.auth.updateUser({ password: newPassword });
+    else request = sb.auth.signInWithPassword({ email: email, password: password });
 
     request.then(function (res) {
       if (res.error) { showAuthMessage(translateAuthError(res.error), true); return; }
-      if (authMode === "signup" && !res.data.session) {
+
+      if (mode === "signup" && !res.data.session) {
         setAuthMode("signin");
         showAuthMessage("Fast geschafft: Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine Adresse und melde dich danach an.", false);
+      } else if (mode === "reset") {
+        setAuthMode("signin");
+        /* Bewusst ohne Aussage darüber, ob es das Konto gibt - sonst ließen sich
+           über das Formular fremde Adressen durchprobieren. */
+        showAuthMessage("Falls es zu " + email + " ein Konto gibt, ist der Link jetzt unterwegs. Schau zur Sicherheit auch im Spam-Ordner nach.", false);
+      } else if (mode === "recovery") {
+        recoveryActive = false;
+        var user = res.data && res.data.user;
+        if (user) {
+          lastHandledUserId = user.id;
+          loadUserData(user);
+        } else {
+          setAuthMode("signin");
+          showAuthMessage("Passwort geändert. Bitte melde dich mit dem neuen Passwort an.", false);
+        }
       }
       /* Bei erfolgreichem Login/Registrierung mit sofortiger Session übernimmt
          onAuthStateChange unten das Laden der Daten und Umschalten der Ansicht. */
@@ -1640,17 +1756,35 @@
   var lastHandledUserId = null;
 
   sb.auth.onAuthStateChange(function (event, session) {
+    /* Ein Reset-Link meldet die Person technisch bereits an. Ohne diese Weiche
+       liefe sie direkt in die App, ohne je ein neues Passwort gesetzt zu haben. */
+    if (recoveryActive && event !== "SIGNED_OUT") {
+      if (session && session.user) {
+        lastHandledUserId = null;
+        setAuthMode("recovery");
+        showScreen("auth");
+      }
+      return;
+    }
+
     if (session && session.user) {
       if (lastHandledUserId === session.user.id) return;
       lastHandledUserId = session.user.id;
       loadUserData(session.user);
     } else {
+      recoveryActive = false;
       lastHandledUserId = null;
       unsubscribeRealtime();
       currentUserId = null;
       state = deepClone(DEFAULTS);
       document.getElementById("auth-email").value = "";
       setAuthMode("signin");
+      /* Abgelaufener oder schon benutzter Link: Supabase hängt den Grund an die
+         URL, ohne dass je eine Session entsteht. */
+      if (urlAuthError) {
+        showAuthMessage(translateAuthError({ message: urlAuthError }), true);
+        urlAuthError = null;
+      }
       showScreen("auth");
     }
   });
