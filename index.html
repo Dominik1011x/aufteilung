@@ -2,8 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gehalt & Mietaufteilung</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -604,6 +603,16 @@
   .auth-message.error { background: var(--accent2-soft); color: var(--accent2); }
 
   .account-chip { display: flex; align-items: center; gap: 10px; }
+  .btn-theme {
+    appearance: none; cursor: pointer; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0;
+    font: inherit; font-size: 14px; line-height: 1;
+    border: var(--btn-ghost-border); background: var(--btn-ghost-bg); color: var(--ink-soft);
+    border-radius: var(--pill);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .btn-theme:hover { background: var(--accent-soft); color: var(--accent); }
   .account-chip .account-email { font-size: 12.5px; color: var(--ink-faint); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn-logout {
     appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 12.5px;
@@ -633,6 +642,24 @@
   .ledger-total, .calc-line.total { border-top-width: 2px; }
   .alloc-bar span + span { box-shadow: -1px 0 0 var(--line-strong); }
 </style>
+
+<script>
+  /* Muss vor dem ersten Rendern laufen: sonst blitzt beim Öffnen kurz das
+     Systemschema auf, bevor die gespeicherte Wahl greift. Bewusst kein Teil
+     des Hauptskripts unten, das läuft erst nach dem Aufbau der Seite. */
+  (function () {
+    var stored = null;
+    /* localStorage wirft im privaten Modus mancher Browser statt null zu liefern. */
+    try { stored = localStorage.getItem("theme"); } catch (e) {}
+    if (stored === "light" || stored === "dark") {
+      document.documentElement.setAttribute("data-theme", stored);
+    }
+    var dark = stored === "dark" ||
+      (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", dark ? "#0a0a0a" : "#ffffff");
+  })();
+</script>
 
 <div class="loading-screen" id="loading-screen">
   <div class="loading-spinner" aria-hidden="true"></div>
@@ -682,6 +709,7 @@
       <button type="button" data-mode="meilen" role="tab" aria-selected="false">Meilen</button>
     </nav>
     <div class="account-chip">
+      <button type="button" class="btn-theme" id="btn-theme">◐</button>
       <span class="account-email" id="account-email"></span>
       <button type="button" class="btn-logout" id="btn-logout">Abmelden</button>
     </div>
@@ -718,6 +746,64 @@
       window.addEventListener("resize", syncTopbarSpace);
     }
   }
+
+  /* Darstellung: System (folgt dem Gerät), Hell oder Dunkel. Das CSS bringt die
+     drei Zustände über :root[data-theme] schon mit, hier wird nur umgeschaltet
+     und die Wahl pro Gerät gemerkt. */
+  var THEME_ORDER = ["system", "light", "dark"];
+  var THEME_LABEL = { system: "System", light: "Hell", dark: "Dunkel" };
+  var THEME_ICON = { system: "◐", light: "☀︎", dark: "☾" };
+  var darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function currentTheme() {
+    try {
+      var t = localStorage.getItem("theme");
+      if (t === "light" || t === "dark") return t;
+    } catch (e) {}
+    return "system";
+  }
+
+  function themeIsDark() {
+    var t = currentTheme();
+    return t === "dark" || (t === "system" && darkQuery.matches);
+  }
+
+  function syncThemeUi() {
+    var t = currentTheme();
+    var btn = document.getElementById("btn-theme");
+    if (btn) {
+      var label = "Darstellung: " + THEME_LABEL[t] + " – zum Wechseln antippen";
+      btn.textContent = THEME_ICON[t];
+      btn.title = label;
+      btn.setAttribute("aria-label", label);
+    }
+    /* Statusleiste der installierten App mitziehen. */
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", themeIsDark() ? "#0a0a0a" : "#ffffff");
+  }
+
+  function applyTheme(theme) {
+    if (theme === "system") {
+      document.documentElement.removeAttribute("data-theme");
+      try { localStorage.removeItem("theme"); } catch (e) {}
+    } else {
+      document.documentElement.setAttribute("data-theme", theme);
+      try { localStorage.setItem("theme", theme); } catch (e) {}
+    }
+    syncThemeUi();
+  }
+
+  document.getElementById("btn-theme").addEventListener("click", function () {
+    applyTheme(THEME_ORDER[(THEME_ORDER.indexOf(currentTheme()) + 1) % THEME_ORDER.length]);
+  });
+
+  /* Im Systemmodus muss die Statusleistenfarbe mitziehen, wenn das Gerät
+     selbst umschaltet. Ältere iOS-Versionen kennen nur addListener. */
+  var onSchemeChange = function () { if (currentTheme() === "system") syncThemeUi(); };
+  if (darkQuery.addEventListener) darkQuery.addEventListener("change", onSchemeChange);
+  else if (darkQuery.addListener) darkQuery.addListener(onSchemeChange);
+
+  syncThemeUi();
 
   /* Die Hash-Parameter müssen gelesen werden, bevor der Supabase-Client startet:
      der räumt die URL nach dem Verarbeiten eines Magic Links selbst auf, danach
@@ -946,10 +1032,6 @@
     var revolutSum = s.revolut.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
     var trSum = s.traderepublic.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
     var sonstigesSum = s.sonstiges.reduce(function (a, it) { return a + monthlyValue(it); }, 0);
-    var ausgabenSparenGesamt = revolutSum + sonstigesSum + trSum;
-    var bleibtUebrig = num(s.netto) - ausgabenSparenGesamt;
-    var sparquote = num(s.netto) ? trSum / num(s.netto) : 0;
-
     var partnerOn = !!(s.partner && s.partner.enabled);
     var rentCalc = s.rent.map(function (it) {
       var pct = partnerOn ? clamp(num(it.split), 0, 100) / 100 : 1;
@@ -961,11 +1043,19 @@
     var meineMiete = rentCalc.reduce(function (a, it) { return a + it.mine; }, 0);
     var partnerMiete = rentCalc.reduce(function (a, it) { return a + it.partnerVal; }, 0);
 
+    /* Der eigene Mietanteil ist eine laufende Ausgabe wie jede andere und muss
+       deshalb in die Summen und in "bleibt übrig". Zählt bei zwei Personen nur
+       anteilig, weil die andere Hälfte nicht vom eigenen Netto abgeht. */
+    var ausgabenTotal = revolutSum + sonstigesSum + meineMiete;
+    var ausgabenSparenGesamt = ausgabenTotal + trSum;
+    var bleibtUebrig = num(s.netto) - ausgabenSparenGesamt;
+    var sparquote = num(s.netto) ? trSum / num(s.netto) : 0;
+
     var v = s.vodafone;
     var vodafoneMtl = num(v.monate) ? (num(v.total) - num(v.gutschein) - num(v.cashback)) / num(v.monate) : 0;
 
     return {
-      revolutSum: revolutSum, trSum: trSum, sonstigesSum: sonstigesSum,
+      revolutSum: revolutSum, trSum: trSum, sonstigesSum: sonstigesSum, ausgabenTotal: ausgabenTotal,
       ausgabenSparenGesamt: ausgabenSparenGesamt, bleibtUebrig: bleibtUebrig, sparquote: sparquote,
       rentCalc: rentCalc, mieteGesamt: mieteGesamt, meineMiete: meineMiete, partnerMiete: partnerMiete,
       partnerOn: partnerOn, vodafoneMtl: vodafoneMtl
@@ -1016,7 +1106,7 @@
   function renderDashboard(s, c) {
     var el = document.getElementById("view-dashboard");
 
-    var ausgabenTotal = c.revolutSum + c.sonstigesSum;
+    var ausgabenTotal = c.ausgabenTotal;
     var nettoSafe = num(s.netto) || 1;
     var wAusgaben = clamp(ausgabenTotal / nettoSafe, 0, 1) * 100;
     var wSparen = clamp(c.trSum / nettoSafe, 0, 1) * 100;
@@ -1025,7 +1115,7 @@
     var statRow =
       '<div class="stat-row">' +
         '<div class="stat"><div class="label">Nettogehalt</div><div class="value">' + eur(s.netto) + '</div></div>' +
-        '<div class="stat"><div class="label">Ausgaben</div><div class="value">' + eur(ausgabenTotal) + '</div></div>' +
+        '<div class="stat"><div class="label">Ausgaben &amp; Miete</div><div class="value">' + eur(ausgabenTotal) + '</div></div>' +
         '<div class="stat accent"><div class="label">Sparen</div><div class="value">' + eur(c.trSum) + '</div></div>' +
         '<div class="stat"><div class="label">Bleibt übrig</div><div class="value">' + eur(c.bleibtUebrig) + '</div></div>' +
         '<div class="stat"><div class="label">Sparquote</div><div class="value">' + pct1(c.sparquote) + '</div></div>' +
@@ -1160,7 +1250,7 @@
       '<div class="card">' +
         '<h2>Gehalt</h2>' +
         '<div class="field-row"><label>Nettogehalt</label><div class="input-euro">' + inputField("netto", s.netto, "netto") + '</div></div>' +
-        '<div class="calc-line"><span>Ausgaben &amp; Sparen gesamt</span><span class="val" id="calc-ausgabenSparenGesamt"></span></div>' +
+        '<div class="calc-line"><span>Ausgaben, Miete &amp; Sparen gesamt</span><span class="val" id="calc-ausgabenSparenGesamt"></span></div>' +
         '<div class="calc-line"><span>Bleibt übrig</span><span class="val" id="calc-bleibtUebrig"></span></div>' +
         '<div class="calc-line total"><span>Sparquote</span><span class="val" id="calc-sparquote"></span></div>' +
       '</div>';
@@ -1266,7 +1356,9 @@
         saveState();
       });
     });
-    el.querySelectorAll(".btn-remove-row").forEach(function (btn) {
+    /* Nur echte Listeneinträge: "Partner entfernen" trägt dieselbe Klasse, hat
+       aber kein data-remove-list und lief hier sonst in einen Fehler. */
+    el.querySelectorAll(".btn-remove-row[data-remove-list]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var list = btn.getAttribute("data-remove-list");
         var idx = parseInt(btn.getAttribute("data-remove-index"), 10);
