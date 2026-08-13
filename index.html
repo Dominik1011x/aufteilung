@@ -516,19 +516,20 @@
   .field-row.list-row .input-euro::after { right: 9px; }
   .freq-select { flex: none; font-size: 11.5px; padding: 8px 4px; color: var(--ink-soft); width: 64px; }
 
-  /* Auf/Ab-Knöpfe zum Umsortieren von Listeneinträgen: gleiche Gesamthöhe wie
-     der runde Löschknopf daneben, damit die Zeile nicht höher wird. */
-  .list-move { display: flex; flex-direction: column; flex: none; gap: 3px; }
+  /* Auf/Ab-Knöpfe zum Umsortieren von Listeneinträgen. Bewusst mit sichtbarem
+     Rahmen und kräftiger Füllfarbe statt der blassen Ghost-Buttons - die erste
+     Fassung war bei realer Bildschirmgröße kaum als Bedienelement erkennbar. */
+  .list-move { display: flex; flex-direction: column; flex: none; gap: 4px; }
   .list-move button {
     appearance: none; cursor: pointer;
-    width: 22px; height: 12px; padding: 0;
+    width: 28px; height: 19px; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 8px; line-height: 1;
-    border: var(--btn-ghost-border); background: var(--btn-ghost-bg); color: var(--ink-faint);
-    border-radius: 2px;
-    transition: background 0.15s ease, color 0.15s ease;
+    font-size: 12px; font-weight: 700; line-height: 1;
+    border: 1px solid var(--line-strong); background: var(--field-bg); color: var(--ink);
+    border-radius: 3px;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-  .list-move button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .list-move button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .list-move button:disabled { opacity: 0.3; cursor: default; }
 
   .btn-remove-row {
