@@ -89,73 +89,83 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-    --page-base: #0a0a0a;
-    --page-bg: #0a0a0a;
-    --ink: #f5f5f5;
+    /* Reines Schwarz überall (Seite = Karte = nur 1px Rand als Unterschied)
+       wirkte am PC zu hart. Seite jetzt ein dunkles Grau statt Schwarz, Karten
+       eine Stufe heller darüber - das gibt echte Tiefe statt einer einzigen
+       flachen schwarzen Fläche, und die Augen haben weniger Kontrastsprung
+       zur hellen Schrift. */
+    --page-base: #141414;
+    --page-bg: #141414;
+    --ink: #ececec;
     --ink-soft: #a3a3a3;
-    --ink-faint: #6b6b6b;
-    --line: rgba(255, 255, 255, 0.15);
-    --line-strong: #f5f5f5;
+    --ink-faint: #74746f;
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.28);
 
     --accent: #7d9bff;
-    --accent-ink: #0a0a0a;
-    --accent-soft: rgba(125, 155, 255, 0.13);
+    --accent-ink: #14141a;
+    --accent-soft: rgba(125, 155, 255, 0.15);
     --accent2: #ff9463;
-    --accent2-soft: rgba(255, 148, 99, 0.13);
+    --accent2-soft: rgba(255, 148, 99, 0.15);
     --rest: #5fce8b;
-    --rest-soft: rgba(95, 206, 139, 0.13);
+    --rest-soft: rgba(95, 206, 139, 0.15);
 
-    --card-bg: #0a0a0a;
-    --card-border: 1px solid rgba(255, 255, 255, 0.18);
-    --tile-bg: #0a0a0a;
-    --tile-border: 1px solid rgba(255, 255, 255, 0.18);
+    --card-bg: #1c1c1c;
+    --card-border: 1px solid rgba(255, 255, 255, 0.1);
+    --tile-bg: #1c1c1c;
+    --tile-border: 1px solid rgba(255, 255, 255, 0.1);
 
-    --topbar-bg: rgba(10, 10, 10, 0.92);
+    --topbar-bg: rgba(20, 20, 20, 0.92);
 
-    --switch-border: 1px solid rgba(255, 255, 255, 0.18);
-    --switch-active-bg: #f5f5f5;
-    --switch-active-ink: #0a0a0a;
+    --switch-border: 1px solid rgba(255, 255, 255, 0.14);
+    --switch-active-bg: #ececec;
+    --switch-active-ink: #14141a;
 
-    --field-border: 1px solid rgba(255, 255, 255, 0.24);
-    --btn-primary-bg: #f5f5f5;
-    --btn-primary-ink: #0a0a0a;
-    --btn-ghost-border: 1px solid rgba(255, 255, 255, 0.24);
-    --add-border: 1px solid rgba(255, 255, 255, 0.24);
+    --field-border: 1px solid rgba(255, 255, 255, 0.18);
+    --btn-primary-bg: #ececec;
+    --btn-primary-ink: #14141a;
+    --btn-ghost-border: 1px solid rgba(255, 255, 255, 0.18);
+    --add-border: 1px solid rgba(255, 255, 255, 0.18);
     }
   }
   :root[data-theme="dark"] {
-    --page-base: #0a0a0a;
-    --page-bg: #0a0a0a;
-    --ink: #f5f5f5;
+    /* Reines Schwarz überall (Seite = Karte = nur 1px Rand als Unterschied)
+       wirkte am PC zu hart. Seite jetzt ein dunkles Grau statt Schwarz, Karten
+       eine Stufe heller darüber - das gibt echte Tiefe statt einer einzigen
+       flachen schwarzen Fläche, und die Augen haben weniger Kontrastsprung
+       zur hellen Schrift. */
+    --page-base: #141414;
+    --page-bg: #141414;
+    --ink: #ececec;
     --ink-soft: #a3a3a3;
-    --ink-faint: #6b6b6b;
-    --line: rgba(255, 255, 255, 0.15);
-    --line-strong: #f5f5f5;
+    --ink-faint: #74746f;
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.28);
 
     --accent: #7d9bff;
-    --accent-ink: #0a0a0a;
-    --accent-soft: rgba(125, 155, 255, 0.13);
+    --accent-ink: #14141a;
+    --accent-soft: rgba(125, 155, 255, 0.15);
     --accent2: #ff9463;
-    --accent2-soft: rgba(255, 148, 99, 0.13);
+    --accent2-soft: rgba(255, 148, 99, 0.15);
     --rest: #5fce8b;
-    --rest-soft: rgba(95, 206, 139, 0.13);
+    --rest-soft: rgba(95, 206, 139, 0.15);
 
-    --card-bg: #0a0a0a;
-    --card-border: 1px solid rgba(255, 255, 255, 0.18);
-    --tile-bg: #0a0a0a;
-    --tile-border: 1px solid rgba(255, 255, 255, 0.18);
+    --card-bg: #1c1c1c;
+    --card-border: 1px solid rgba(255, 255, 255, 0.1);
+    --tile-bg: #1c1c1c;
+    --tile-border: 1px solid rgba(255, 255, 255, 0.1);
 
-    --topbar-bg: rgba(10, 10, 10, 0.92);
+    --topbar-bg: rgba(20, 20, 20, 0.92);
 
-    --switch-border: 1px solid rgba(255, 255, 255, 0.18);
-    --switch-active-bg: #f5f5f5;
-    --switch-active-ink: #0a0a0a;
+    --switch-border: 1px solid rgba(255, 255, 255, 0.14);
+    --switch-active-bg: #ececec;
+    --switch-active-ink: #14141a;
 
-    --field-border: 1px solid rgba(255, 255, 255, 0.24);
-    --btn-primary-bg: #f5f5f5;
-    --btn-primary-ink: #0a0a0a;
-    --btn-ghost-border: 1px solid rgba(255, 255, 255, 0.24);
-    --add-border: 1px solid rgba(255, 255, 255, 0.24);
+    --field-border: 1px solid rgba(255, 255, 255, 0.18);
+    --btn-primary-bg: #ececec;
+    --btn-primary-ink: #14141a;
+    --btn-ghost-border: 1px solid rgba(255, 255, 255, 0.18);
+    --add-border: 1px solid rgba(255, 255, 255, 0.18);
   }
   :root[data-theme="light"] {
     --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
