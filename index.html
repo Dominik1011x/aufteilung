@@ -526,28 +526,27 @@
   .field-row.list-row .input-euro::after { right: 9px; }
   .freq-select { flex: none; font-size: 11.5px; padding: 8px 4px; color: var(--ink-soft); width: 64px; }
 
-  /* Auf/Ab-Knöpfe zum Umsortieren von Listeneinträgen. Bewusst mit sichtbarem
-     Rahmen und kräftiger Füllfarbe statt der blassen Ghost-Buttons - die erste
-     Fassung war bei realer Bildschirmgröße kaum als Bedienelement erkennbar. */
-  .list-move { display: flex; flex-direction: column; flex: none; gap: 4px; }
-  .list-move button {
-    appearance: none; cursor: pointer;
-    width: 30px; height: 21px; padding: 0;
+  /* Zieh-Griff zum Umsortieren von Listeneinträgen per Pointer Events (Maus
+     + Touch). Bewusst mit sichtbarem Rahmen statt blassem Ghost-Icon - ein
+     zuvor getesteter Auf/Ab-Knopf war bei realer Bildschirmgröße kaum als
+     Bedienelement erkennbar, das gilt für einen unauffälligen Griff genauso. */
+  .drag-handle {
+    cursor: grab; touch-action: none; flex: none; user-select: none;
+    width: 30px; height: 30px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; line-height: 1;
+    font-size: 14px; letter-spacing: -1px; line-height: 1;
     border: 1px solid var(--line-strong); background: var(--field-bg); color: var(--ink);
     border-radius: 3px;
-    /* touch-action verhindert, dass ein Tipp erst als Scroll-Geste gewertet
-       wird - auf iOS kann das sonst dazu führen, dass der erste Tipp auf
-       einen frisch sichtbaren Knopf ins Leere geht. */
-    touch-action: manipulation;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   @media (pointer: coarse) {
-    .list-move button { width: 34px; height: 24px; font-size: 13px; }
+    .drag-handle { width: 34px; height: 34px; font-size: 15px; }
   }
-  .list-move button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-  .list-move button:disabled { opacity: 0.3; cursor: default; }
+  .drag-handle:active { cursor: grabbing; background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .list-item.dragging {
+    position: relative; z-index: 20;
+    background: var(--card-bg); border: 1px solid var(--line-strong); border-radius: var(--field-radius);
+  }
 
   .btn-remove-row {
     appearance: none; cursor: pointer; flex: none;
@@ -1667,15 +1666,11 @@
         '<span class="hint">Meilen &amp; Punkte deiner Vielfliegerprogramme im Blick behalten.</span>' +
       '</div>';
 
-    var providerCount = s.miles.providers.length;
     var providerRows = s.miles.providers.map(function (p, i) {
       var curVal = mc.latest && mc.latest.values[p.id] !== undefined ? mc.latest.values[p.id] : 0;
-      return '<div class="list-item">' +
+      return '<div class="list-item" data-provider-id="' + esc(p.id) + '">' +
         '<div class="field-row list-row">' +
-          '<div class="list-move">' +
-            '<button type="button" data-move-list="miles.providers" data-move-index="' + i + '" data-move-dir="-1" aria-label="Nach oben verschieben"' + (i === 0 ? " disabled" : "") + '>&#9650;</button>' +
-            '<button type="button" data-move-list="miles.providers" data-move-index="' + i + '" data-move-dir="1" aria-label="Nach unten verschieben"' + (i === providerCount - 1 ? " disabled" : "") + '>&#9660;</button>' +
-          '</div>' +
+          '<span class="drag-handle" aria-label="Verschieben" title="Zum Sortieren ziehen">&#8942;&#8942;</span>' +
           '<input type="text" class="label-input" data-bind-text="miles.providers.' + i + '.label" value="' + esc(p.label) + '" placeholder="Anbieter">' +
           '<input type="number" step="1" inputmode="numeric" class="miles-value-input" data-provider-id="' + esc(p.id) + '" value="' + num(curVal) + '">' +
           '<button type="button" class="btn-remove-row" data-remove-list="miles.providers" data-remove-index="' + i + '" aria-label="Anbieter entfernen">&times;</button>' +
@@ -1730,19 +1725,7 @@
     });
     /* Reihenfolge der Anbieter bestimmt auch die Spaltenfolge in "Aktueller
        Stand" und im Verlauf - hier einmal umsortiert, stimmt es überall. */
-    el.querySelectorAll("[data-move-dir]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var list = getPath(state, btn.getAttribute("data-move-list"));
-        var idx = parseInt(btn.getAttribute("data-move-index"), 10);
-        var target = idx + parseInt(btn.getAttribute("data-move-dir"), 10);
-        if (target < 0 || target >= list.length) return;
-        var tmp = list[idx];
-        list[idx] = list[target];
-        list[target] = tmp;
-        buildMeilen(state);
-        saveState();
-      });
-    });
+    wireMilesDrag(el);
     el.querySelector('[data-add-list="miles.providers"]').addEventListener("click", function () {
       state.miles.providers.push({ id: uid(), label: "", excludeFromTotal: false });
       buildMeilen(state);
@@ -1772,6 +1755,75 @@
     }
 
     updateMeilenSummary(s);
+  }
+
+  /* Zieh-Sortierung per Pointer Events (Maus + Touch): der Griff wird
+     per translateY bewegt, beim Überschreiten der Mitte einer Nachbarzeile
+     tauschen die beiden im DOM die Plätze. Der Startpunkt wird bei jedem
+     Tausch um die Höhe der getauschten Zeile korrigiert, damit die Zeile
+     unter dem Finger bleibt statt zu springen. */
+  function wireMilesDrag(el) {
+    var drag = null;
+
+    function isRow(node) { return node && node.classList && node.classList.contains("list-item"); }
+
+    el.querySelectorAll(".drag-handle").forEach(function (handle) {
+      handle.addEventListener("pointerdown", function (e) {
+        var item = handle.closest(".list-item");
+        try { handle.setPointerCapture(e.pointerId); } catch (err) { /* z.B. Testumgebung ohne aktiven Pointer - Drag funktioniert trotzdem */ }
+        drag = {
+          pointerId: e.pointerId,
+          item: item,
+          list: item.parentElement,
+          startClientY: e.clientY,
+          gap: parseFloat(getComputedStyle(item).marginBottom) || 0
+        };
+        item.classList.add("dragging");
+        e.preventDefault();
+      });
+
+      handle.addEventListener("pointermove", function (e) {
+        if (!drag || e.pointerId !== drag.pointerId) return;
+        drag.item.style.transform = "translateY(" + (e.clientY - drag.startClientY) + "px)";
+        var rect = drag.item.getBoundingClientRect();
+        var center = rect.top + rect.height / 2;
+
+        var next = drag.item.nextElementSibling;
+        if (isRow(next)) {
+          var nRect = next.getBoundingClientRect();
+          if (center > nRect.top + nRect.height / 2) {
+            drag.list.insertBefore(next, drag.item);
+            drag.startClientY += nRect.height + drag.gap;
+            drag.item.style.transform = "translateY(" + (e.clientY - drag.startClientY) + "px)";
+            return;
+          }
+        }
+        var prev = drag.item.previousElementSibling;
+        if (isRow(prev)) {
+          var pRect = prev.getBoundingClientRect();
+          if (center < pRect.top + pRect.height / 2) {
+            drag.list.insertBefore(drag.item, prev);
+            drag.startClientY -= pRect.height + drag.gap;
+            drag.item.style.transform = "translateY(" + (e.clientY - drag.startClientY) + "px)";
+          }
+        }
+      });
+
+      function endDrag(e) {
+        if (!drag || e.pointerId !== drag.pointerId) return;
+        var finished = drag;
+        drag = null;
+        finished.item.classList.remove("dragging");
+        finished.item.style.transform = "";
+        var ids = Array.prototype.slice.call(finished.list.querySelectorAll(".list-item"))
+          .map(function (row) { return row.getAttribute("data-provider-id"); });
+        state.miles.providers.sort(function (a, b) { return ids.indexOf(a.id) - ids.indexOf(b.id); });
+        buildMeilen(state);
+        saveState();
+      }
+      handle.addEventListener("pointerup", endDrag);
+      handle.addEventListener("pointercancel", endDrag);
+    });
   }
 
   function render() {
