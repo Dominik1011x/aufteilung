@@ -1177,19 +1177,28 @@
       return ' <span class="split-hint">(' + eur(it.value) + '/Jahr)</span>';
     }
 
-    function ledgerCard(title, items, sum) {
+    /* "extra" zeigt eine zusätzliche, nicht editierbare Zeile an (z.B. den
+       Mietanteil in Sonstiges) - rein zur Anzeige, gespeist direkt aus der
+       Berechnung in "Zusammensetzung Miete". Fließt bewusst NICHT in die
+       manuell gepflegte Liste "items" ein, sonst würde die Miete doppelt
+       gezählt (einmal hier, einmal in der eigentlichen Mietaufteilung). */
+    function ledgerCard(title, items, sum, extra) {
       var rows = items.map(function (it) {
         return '<div class="ledger-row"><span>' + esc(it.label || "(ohne Bezeichnung)") + freqHint(it) + '</span><span class="val">' + eur(monthlyValue(it)) + '</span></div>';
       }).join("");
-      if (!items.length) rows = '<p class="subtle" style="margin:0 0 8px">Noch keine Einträge.</p>';
-      return '<div class="card"><h2>' + title + '</h2>' + rows +
-        '<div class="ledger-total"><span>Insgesamt</span><span class="val">' + eur(sum) + '</span></div></div>';
+      if (!items.length && !extra) rows = '<p class="subtle" style="margin:0 0 8px">Noch keine Einträge.</p>';
+      var extraRow = extra
+        ? '<div class="ledger-row"><span>' + esc(extra.label) + ' <span class="subtle">(automatisch)</span></span><span class="val">' + eur(extra.value) + '</span></div>'
+        : "";
+      var total = sum + (extra ? extra.value : 0);
+      return '<div class="card"><h2>' + title + '</h2>' + rows + extraRow +
+        '<div class="ledger-total"><span>Insgesamt</span><span class="val">' + eur(total) + '</span></div></div>';
     }
 
     var ledgerGrid = '<div class="ledger-grid">' +
       ledgerCard("Ausgaben", s.revolut, c.revolutSum) +
       ledgerCard("Sparen", s.traderepublic, c.trSum) +
-      ledgerCard("Sonstiges", s.sonstiges, c.sonstigesSum) +
+      ledgerCard("Sonstiges", s.sonstiges, c.sonstigesSum, { label: "Miete (mein Anteil)", value: c.meineMiete }) +
       '</div>';
 
     var partnerOn = c.partnerOn;
